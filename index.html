@@ -1,0 +1,1883 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Arrêts Atelier — Pilotage Atelier</title>
+<style>
+  :root{
+    --bg:#000; --surface-1:#0e0e0e; --surface-2:#171717; --border:#2a2a2a;
+    --text-primary:#f5f5f5; --text-secondary:#a3a3a3; --brand:#2dd4aa;
+    --good:#22c55e; --good-bg:#05200f; --good-text:#4ade80;
+    --critical:#ef4444; --critical-bg:#2a0d0d; --critical-text:#f87171;
+    --warning:#f59e0b; --warning-bg:#2a1a05; --warning-text:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text-primary);font:15px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  body{padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0) 0}
+  main{max-width:1100px;margin:0 auto;padding:14px 14px 50px}
+  h1{font-size:22px;margin:0}
+  h2{font-size:15px;margin:0 0 8px}
+  .top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .tab{padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-weight:700;cursor:pointer;font-family:inherit;font-size:13px}
+  .tab.on{background:var(--brand);color:#04130e;border-color:var(--brand)}
+  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
+  .sub{font-size:12px;color:var(--text-secondary);margin:-4px 0 10px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:4px;min-width:150px;flex:1}
+  label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary)}
+  select,input,textarea{background:var(--surface-2);color:var(--text-primary);border:1px solid var(--border);border-radius:10px;padding:10px;font:inherit}
+  textarea{width:100%;min-height:150px;font-size:13px}
+  .btn{padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-weight:700;cursor:pointer;font-family:inherit}
+  .btn.primary{background:var(--brand);border-color:var(--brand);color:#04130e}
+  .hint{font-size:12.5px;color:var(--text-secondary);line-height:1.45}
+  .err{color:var(--critical-text)}
+  .ok{color:var(--good-text)}
+  .conn{font-size:12px;display:inline-flex;align-items:center;gap:6px;color:var(--text-secondary)}
+  .conn::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--text-secondary)}
+  .conn.on{color:var(--good-text)} .conn.on::before{background:var(--good);animation:pulse 1.6s infinite}
+  .conn.off{color:var(--critical-text)} .conn.off::before{background:var(--critical)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  [hidden]{display:none!important}
+  /* Poste scan */
+  .machine{font-size:26px;font-weight:800}
+  .status{border-radius:16px;padding:24px 16px;text-align:center;border:2px solid var(--border);background:var(--surface-1);margin-bottom:12px}
+  .status.run{background:var(--good-bg);border-color:var(--good);color:var(--good-text)}
+  .status.stop{background:var(--critical-bg);border-color:var(--critical);color:var(--critical-text)}
+  .status.stop.plan{background:var(--warning-bg);border-color:var(--warning);color:var(--warning-text)}
+  .st{font-size:36px;font-weight:800}
+  .sc{font-size:24px;font-weight:700;margin-top:4px}
+  .se{font-size:60px;font-weight:800;font-variant-numeric:tabular-nums;margin:4px 0}
+  .sh{font-size:14px;opacity:.9}
+  .scanbox{width:100%;padding:18px;font-size:22px;font-weight:700;text-align:center;border:2px dashed var(--border);border-radius:12px}
+  .scan-hidden{position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none}
+  .scanbox:focus{outline:none;border-style:solid;border-color:var(--good);box-shadow:0 0 0 4px var(--good-bg)}
+  .msg{padding:12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-secondary);margin:12px 0}
+  .msg.ok{color:var(--good-text);background:var(--good-bg);border-color:var(--good)}
+  .msg.err{color:var(--critical-text);background:var(--critical-bg);border-color:var(--critical)}
+  .fin{width:100%;padding:18px;font-size:20px;font-weight:800;border-radius:12px;border:none;background:var(--good);color:#04130e;cursor:pointer;margin-bottom:12px;font-family:inherit}
+  .fin:disabled{opacity:.35}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+  .cb{padding:16px 10px;font-size:15px;font-weight:700;border-radius:12px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);cursor:pointer;text-align:left;font-family:inherit}
+  .cb.np{border-left:6px solid var(--critical)} .cb.plan{border-left:6px solid var(--warning)}
+  .cb.active{outline:3px solid var(--critical)}
+  /* Suivi */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+  @media (max-width:640px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .kpi{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:10px 12px}
+  .kpi .v{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
+  .kpi .l{font-size:11px;color:var(--text-secondary);text-transform:uppercase}
+  .kpi.alert{border-color:var(--critical);background:var(--critical-bg)} .kpi.alert .v{color:var(--critical-text)}
+  .open{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+  .oc{border-radius:12px;padding:12px;border:2px solid var(--critical);background:var(--critical-bg);color:var(--critical-text)}
+  .oc.plan{border-color:var(--warning);background:var(--warning-bg);color:var(--warning-text)}
+  .oc.new{animation:flash .8s ease 3}
+  @keyframes flash{0%{transform:scale(1.04)}100%{transform:scale(1)}}
+  .oc .m{font-size:18px;font-weight:800} .oc .c{font-weight:700} .oc .t{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums} .oc .s{font-size:12px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px} @media (max-width:800px){.two{grid-template-columns:1fr}}
+  .r{display:flex;justify-content:space-between;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border)}
+  .r:last-child{border-bottom:none}
+  .r .a{font-weight:700} .r .b{font-size:12px;color:var(--text-secondary);margin-top:2px}
+  .r .d{text-align:right;white-space:nowrap;font-weight:700;font-variant-numeric:tabular-nums}
+  .bar{height:6px;border-radius:3px;background:var(--critical);margin-top:4px} .bar.plan{background:var(--warning)}
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:6px;margin-left:4px}
+  .tag.np{background:var(--critical-bg);color:var(--critical-text)} .tag.plan{background:var(--warning-bg);color:var(--warning-text)}
+  .empty{color:var(--text-secondary);font-size:13px;padding:8px 0}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--surface-2);border:1px solid var(--border);padding:12px 16px;border-radius:12px;z-index:50;max-width:92vw}
+  .toast.err{border-color:var(--critical);color:var(--critical-text)}
+  table{width:100%;border-collapse:collapse;font-size:13px} th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--border)} th{font-size:11px;color:var(--text-secondary);text-transform:uppercase}
+  /* Impression des QR */
+  #printArea{display:none}
+  @media print{
+    body{background:#fff;color:#000} main{display:none} #printArea{display:block}
+    .qp{page-break-after:always;padding:10mm} .qp:last-child{page-break-after:auto}
+    .qh{font:700 18px sans-serif;margin-bottom:2mm} .qs{font:12px sans-serif;color:#444;margin-bottom:6mm}
+    .qg{display:grid;grid-template-columns:repeat(3,1fr);gap:5mm}
+    .qc{border:2px solid #000;border-radius:3mm;text-align:center;padding:0 0 3mm;break-inside:avoid}
+    .qt{color:#fff;font:700 10px sans-serif;padding:2mm;border-radius:2mm 2mm 0 0}
+    .qc svg{width:46mm;height:46mm;margin:3mm auto 1mm;display:block}
+    .ql{font:700 13px sans-serif;padding:0 2mm}
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div>
+      <h1 id="appTitle" title="Double-clic : afficher / masquer le menu">Arrêts Atelier</h1>
+      <span class="conn" id="conn">Connexion…</span>
+    </div>
+    <div class="tabs" id="tabs" hidden>
+      <button class="tab" data-view="poste">Poste scan</button>
+      <button class="tab" data-view="suivi">Suivi</button>
+      <button class="tab" data-view="params">Paramètres</button>
+    </div>
+  </div>
+
+  <!-- Connexion Firebase (première ouverture) -->
+  <section id="vSetup" hidden>
+    <div class="card">
+      <h2>Connecter à la base Firebase</h2>
+      <div class="sub">Une seule fois par appareil. Firebase → ⚙️ Paramètres du projet → Vos applications → Config.</div>
+      <textarea id="cfgText" placeholder="Collez ici le bloc const firebaseConfig = { … };"></textarea>
+      <div class="row" style="margin-top:10px"><button class="btn primary" id="cfgSave">Connecter</button></div>
+      <div class="hint err" id="cfgErr" style="margin-top:8px"></div>
+      <div class="hint" style="margin-top:8px">Dans Firebase, activez <b>Firestore Database</b> et <b>Authentication → Anonyme</b>. Il faut Internet sur la tablette / le téléphone.</div>
+    </div>
+  </section>
+
+  <!-- Poste scan (tablette + douchette QR) -->
+  <section id="vPoste" hidden>
+    <div class="top" style="margin-bottom:8px">
+      <div><div class="machine" id="pTitle">Poste non configuré</div><div class="hint" id="pSub"></div></div>
+      <button class="btn" id="pChange">Changer de machine</button>
+    </div>
+    <div class="card" id="pCfg" hidden>
+      <h2>Machine de cette tablette</h2>
+      <div class="row">
+        <div class="field"><label>Machine</label><select id="pMachine"></select></div>
+        <div class="field"><label>Ligne</label><select id="pLigne"></select></div>
+        <div class="field"><label>Équipe</label><select id="pEquipe"></select></div>
+      </div>
+      <div class="row" style="margin-top:10px"><button class="btn primary" id="pCfgOk">Valider</button></div>
+      <div class="hint" style="margin-top:8px">Ou scannez le QR de la machine.</div>
+    </div>
+    <div class="status" id="pStatus"></div>
+    <!-- Champ de réception de la douchette : invisible, il garde le focus pour recevoir les scans. -->
+    <input id="scanBox" class="scanbox scan-hidden" aria-label="Réception douchette" tabindex="-1" inputmode="none" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Scannez le QR ici…">
+    <div class="msg" id="pMsg">Prêt à scanner.</div>
+    <button class="fin" id="pFin" disabled>FIN D'ARRÊT — reprise production</button>
+    <div class="card" id="pCauses">
+      <h2>Arrêts non planifiés</h2><div class="sub">Sans douchette, touchez la cause</div>
+      <div class="grid" id="pNP"></div>
+      <h2 style="margin-top:14px">Arrêts planifiés</h2>
+      <div class="grid" id="pP"></div>
+    </div>
+    <div class="card"><h2>Arrêts du jour sur ce poste</h2><div id="pToday"></div></div>
+  </section>
+
+  <!-- Suivi (téléphone) -->
+  <section id="vSuivi" hidden>
+    <div class="row" style="margin-bottom:12px;align-items:center">
+      <select id="sPer" style="max-width:120px"><option value="jour">Jour</option><option value="semaine">7 jours</option><option value="mois">Mois</option></select>
+      <input type="date" id="sDate" style="max-width:170px">
+      <span class="hint" id="sNote"></span>
+    </div>
+    <div class="kpis" id="sKpis"></div>
+    <div class="card"><h2>À l'arrêt maintenant</h2><div class="open" id="sOpen"></div></div>
+    <div class="two">
+      <div class="card"><h2>Par machine</h2><div class="sub per-lbl"></div><div id="sMach"></div></div>
+      <div class="card"><h2>Top causes</h2><div class="sub per-lbl"></div><div id="sCause"></div></div>
+      <div class="card"><h2>Par ligne</h2><div class="sub per-lbl"></div><div id="sLigne"></div></div>
+      <div class="card"><h2>Par équipe</h2><div class="sub per-lbl"></div><div id="sEquipe"></div></div>
+    </div>
+    <div class="card"><h2>Journal des arrêts</h2><div id="sJournal"></div></div>
+  </section>
+
+  <!-- Paramètres -->
+  <section id="vParams" hidden>
+    <div class="card">
+      <h2>Listes partagées (tous les appareils)</h2>
+      <div class="sub">Une valeur par ligne. Après un changement de cause ou de machine, réimprimez les QR.</div>
+      <div class="two">
+        <div class="field"><label>Arrêts non planifiés</label><textarea id="lNP"></textarea></div>
+        <div class="field"><label>Arrêts planifiés</label><textarea id="lP"></textarea></div>
+        <div class="field"><label>Machines</label><textarea id="lM"></textarea></div>
+        <div class="field"><label>Lignes</label><textarea id="lL" style="min-height:80px"></textarea><label style="margin-top:8px">Équipes</label><textarea id="lE" style="min-height:80px"></textarea></div>
+      </div>
+      <div class="row" style="margin-top:10px"><button class="btn primary" id="lSave">Enregistrer les listes</button></div>
+    </div>
+    <div class="card">
+      <h2>QR codes à imprimer</h2>
+      <div class="sub">Compatibles avec la page Scan arrêts de Pilotage Atelier (même codes).</div>
+      <div class="row"><button class="btn" id="qCauses">Imprimer QR des causes</button><button class="btn" id="qMachines">Imprimer QR des machines</button></div>
+    </div>
+    <div class="card">
+      <h2>Envoyer vers Pilotage Atelier (TRS)</h2>
+      <div class="sub">Exportez les arrêts terminés, puis dans Pilotage Atelier : Scan arrêts → « Importer des arrêts (JSON) ». Un arrêt déjà importé n'est pas dupliqué.</div>
+      <div class="row">
+        <div class="field"><label>Du</label><input type="date" id="eFrom"></div>
+        <div class="field"><label>Au</label><input type="date" id="eTo"></div>
+        <button class="btn primary" id="eGo">Exporter (JSON)</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Tous les arrêts (7 jours)</h2>
+      <div style="overflow-x:auto" id="aAll"></div>
+    </div>
+    <div class="card" id="opCard">
+      <h2>Fichier pour les opérateurs</h2>
+      <div class="sub">Crée une copie de ce fichier avec la connexion Firebase déjà dedans : l'opérateur l'ouvre et il marche tout de suite, sans rien coller. Les listes (machines, causes, lignes) restent celles de Firebase.</div>
+      <div class="row">
+        <div class="field"><label>Page d'ouverture</label><select id="opView"><option value="poste">Poste scan (tablette)</option><option value="suivi">Suivi (téléphone)</option></select></div>
+        <div class="field"><label>Machine (option)</label><select id="opMachine"></select></div>
+        <div class="field"><label>Ligne (option)</label><select id="opLigne"></select></div>
+        <div class="field"><label>Équipe (option)</label><select id="opEquipe"></select></div>
+      </div>
+      <div class="row" style="margin-top:10px;align-items:center">
+        <label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:13px;letter-spacing:0;color:var(--text-primary)"><input type="checkbox" id="opLock" checked> Masquer « Paramètres » pour l'opérateur</label>
+        <button class="btn primary" id="opGo">Télécharger le fichier opérateur</button>
+      </div>
+      <div class="hint" style="margin-top:8px">Sans machine choisie, l'opérateur la choisit une fois sur sa tablette (elle est mémorisée).</div>
+    </div>
+    <div class="card">
+      <h2>Base Firebase</h2>
+      <div class="hint" id="fbInfo"></div>
+      <div class="row" style="margin-top:10px"><button class="btn" id="fbReset">Changer de base Firebase</button></div>
+    </div>
+  </section>
+</main>
+<div id="printArea"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+(function(){
+  "use strict";
+  // =====================================================================================
+  // Arrêts Atelier — fichier autonome relié à Firebase (Firestore).
+  //  • Poste scan  : tablette + douchette QR Bluetooth (mode clavier) → collection « arrets »
+  //  • Suivi       : téléphone, en direct (onSnapshot)
+  //  • Paramètres  : listes partagées (doc config/arrets), QR à imprimer, export JSON → Pilotage Atelier
+  // Les QR sont identiques à ceux de Pilotage Atelier (même empreinte des libellés).
+  // =====================================================================================
+  // Copie du fichier tel qu'il a été ouvert (avant toute modification de la page) : sert à créer le
+  // fichier opérateur avec la connexion Firebase et les réglages déjà intégrés.
+  var PRISTINE = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+  var EMBED_CONFIG = /*__FIREBASE_CONFIG__*/{"apiKey": "AIzaSyC8VWaR6AwSK9g_JIJWGzCOZOiy7DmNaHc", "authDomain": "pilotage-atelier-11efe.firebaseapp.com", "projectId": "pilotage-atelier-11efe", "storageBucket": "pilotage-atelier-11efe.firebasestorage.app", "messagingSenderId": "956804672950", "appId": "1:956804672950:web:6832c88296c201226f6517", "measurementId": "G-8M8E6MFV62"};
+  var EMBED_OPTS = /*__OPTS__*/{"view":"poste","lock":true,"poste":null}; // { view, poste: {machine, ligne, equipe}, lock }
+  var PA_QR = (function(){
+var QRMode = {
+    MODE_NUMBER :       1 << 0,
+    MODE_ALPHA_NUM :    1 << 1,
+    MODE_8BIT_BYTE :    1 << 2,
+    MODE_KANJI :        1 << 3
+};
+var QRErrorCorrectLevel = {
+	L : 1,
+	M : 0,
+	Q : 3,
+	H : 2
+};
+
+var QRMaskPattern = {
+	PATTERN000 : 0,
+	PATTERN001 : 1,
+	PATTERN010 : 2,
+	PATTERN011 : 3,
+	PATTERN100 : 4,
+	PATTERN101 : 5,
+	PATTERN110 : 6,
+	PATTERN111 : 7
+};
+var QRMath = {
+
+	glog : function(n) {
+	
+		if (n < 1) {
+			throw new Error("glog(" + n + ")");
+		}
+		
+		return QRMath.LOG_TABLE[n];
+	},
+	
+	gexp : function(n) {
+	
+		while (n < 0) {
+			n += 255;
+		}
+	
+		while (n >= 256) {
+			n -= 255;
+		}
+	
+		return QRMath.EXP_TABLE[n];
+	},
+	
+	EXP_TABLE : new Array(256),
+	
+	LOG_TABLE : new Array(256)
+
+};
+	
+for (var i = 0; i < 8; i++) {
+	QRMath.EXP_TABLE[i] = 1 << i;
+}
+for (var i = 8; i < 256; i++) {
+	QRMath.EXP_TABLE[i] = QRMath.EXP_TABLE[i - 4]
+		^ QRMath.EXP_TABLE[i - 5]
+		^ QRMath.EXP_TABLE[i - 6]
+		^ QRMath.EXP_TABLE[i - 8];
+}
+for (var i = 0; i < 255; i++) {
+	QRMath.LOG_TABLE[QRMath.EXP_TABLE[i] ] = i;
+}
+
+
+
+function QRPolynomial(num, shift) {
+	if (num.length === undefined) {
+		throw new Error(num.length + "/" + shift);
+	}
+
+	var offset = 0;
+
+	while (offset < num.length && num[offset] === 0) {
+		offset++;
+	}
+
+	this.num = new Array(num.length - offset + shift);
+	for (var i = 0; i < num.length - offset; i++) {
+		this.num[i] = num[i + offset];
+	}
+}
+
+QRPolynomial.prototype = {
+
+	get : function(index) {
+		return this.num[index];
+	},
+	
+	getLength : function() {
+		return this.num.length;
+	},
+	
+	multiply : function(e) {
+	
+		var num = new Array(this.getLength() + e.getLength() - 1);
+	
+		for (var i = 0; i < this.getLength(); i++) {
+			for (var j = 0; j < e.getLength(); j++) {
+				num[i + j] ^= QRMath.gexp(QRMath.glog(this.get(i) ) + QRMath.glog(e.get(j) ) );
+			}
+		}
+	
+		return new QRPolynomial(num, 0);
+	},
+	
+	mod : function(e) {
+	
+		if (this.getLength() - e.getLength() < 0) {
+			return this;
+		}
+	
+		var ratio = QRMath.glog(this.get(0) ) - QRMath.glog(e.get(0) );
+	
+		var num = new Array(this.getLength() );
+		
+		for (var i = 0; i < this.getLength(); i++) {
+			num[i] = this.get(i);
+		}
+		
+		for (var x = 0; x < e.getLength(); x++) {
+			num[x] ^= QRMath.gexp(QRMath.glog(e.get(x) ) + ratio);
+		}
+	
+		// recursive call
+		return new QRPolynomial(num, 0).mod(e);
+	}
+};
+
+
+
+var QRUtil = {
+
+    PATTERN_POSITION_TABLE : [
+        [],
+        [6, 18],
+        [6, 22],
+        [6, 26],
+        [6, 30],
+        [6, 34],
+        [6, 22, 38],
+        [6, 24, 42],
+        [6, 26, 46],
+        [6, 28, 50],
+        [6, 30, 54],        
+        [6, 32, 58],
+        [6, 34, 62],
+        [6, 26, 46, 66],
+        [6, 26, 48, 70],
+        [6, 26, 50, 74],
+        [6, 30, 54, 78],
+        [6, 30, 56, 82],
+        [6, 30, 58, 86],
+        [6, 34, 62, 90],
+        [6, 28, 50, 72, 94],
+        [6, 26, 50, 74, 98],
+        [6, 30, 54, 78, 102],
+        [6, 28, 54, 80, 106],
+        [6, 32, 58, 84, 110],
+        [6, 30, 58, 86, 114],
+        [6, 34, 62, 90, 118],
+        [6, 26, 50, 74, 98, 122],
+        [6, 30, 54, 78, 102, 126],
+        [6, 26, 52, 78, 104, 130],
+        [6, 30, 56, 82, 108, 134],
+        [6, 34, 60, 86, 112, 138],
+        [6, 30, 58, 86, 114, 142],
+        [6, 34, 62, 90, 118, 146],
+        [6, 30, 54, 78, 102, 126, 150],
+        [6, 24, 50, 76, 102, 128, 154],
+        [6, 28, 54, 80, 106, 132, 158],
+        [6, 32, 58, 84, 110, 136, 162],
+        [6, 26, 54, 82, 110, 138, 166],
+        [6, 30, 58, 86, 114, 142, 170]
+    ],
+
+    G15 : (1 << 10) | (1 << 8) | (1 << 5) | (1 << 4) | (1 << 2) | (1 << 1) | (1 << 0),
+    G18 : (1 << 12) | (1 << 11) | (1 << 10) | (1 << 9) | (1 << 8) | (1 << 5) | (1 << 2) | (1 << 0),
+    G15_MASK : (1 << 14) | (1 << 12) | (1 << 10)    | (1 << 4) | (1 << 1),
+
+    getBCHTypeInfo : function(data) {
+        var d = data << 10;
+        while (QRUtil.getBCHDigit(d) - QRUtil.getBCHDigit(QRUtil.G15) >= 0) {
+            d ^= (QRUtil.G15 << (QRUtil.getBCHDigit(d) - QRUtil.getBCHDigit(QRUtil.G15) ) );    
+        }
+        return ( (data << 10) | d) ^ QRUtil.G15_MASK;
+    },
+
+    getBCHTypeNumber : function(data) {
+        var d = data << 12;
+        while (QRUtil.getBCHDigit(d) - QRUtil.getBCHDigit(QRUtil.G18) >= 0) {
+            d ^= (QRUtil.G18 << (QRUtil.getBCHDigit(d) - QRUtil.getBCHDigit(QRUtil.G18) ) );    
+        }
+        return (data << 12) | d;
+    },
+
+    getBCHDigit : function(data) {
+
+        var digit = 0;
+
+        while (data !== 0) {
+            digit++;
+            data >>>= 1;
+        }
+
+        return digit;
+    },
+
+    getPatternPosition : function(typeNumber) {
+        return QRUtil.PATTERN_POSITION_TABLE[typeNumber - 1];
+    },
+
+    getMask : function(maskPattern, i, j) {
+        
+        switch (maskPattern) {
+            
+        case QRMaskPattern.PATTERN000 : return (i + j) % 2 === 0;
+        case QRMaskPattern.PATTERN001 : return i % 2 === 0;
+        case QRMaskPattern.PATTERN010 : return j % 3 === 0;
+        case QRMaskPattern.PATTERN011 : return (i + j) % 3 === 0;
+        case QRMaskPattern.PATTERN100 : return (Math.floor(i / 2) + Math.floor(j / 3) ) % 2 === 0;
+        case QRMaskPattern.PATTERN101 : return (i * j) % 2 + (i * j) % 3 === 0;
+        case QRMaskPattern.PATTERN110 : return ( (i * j) % 2 + (i * j) % 3) % 2 === 0;
+        case QRMaskPattern.PATTERN111 : return ( (i * j) % 3 + (i + j) % 2) % 2 === 0;
+
+        default :
+            throw new Error("bad maskPattern:" + maskPattern);
+        }
+    },
+
+    getErrorCorrectPolynomial : function(errorCorrectLength) {
+
+        var a = new QRPolynomial([1], 0);
+
+        for (var i = 0; i < errorCorrectLength; i++) {
+            a = a.multiply(new QRPolynomial([1, QRMath.gexp(i)], 0) );
+        }
+
+        return a;
+    },
+
+    getLengthInBits : function(mode, type) {
+
+        if (1 <= type && type < 10) {
+
+            // 1 - 9
+
+            switch(mode) {
+            case QRMode.MODE_NUMBER     : return 10;
+            case QRMode.MODE_ALPHA_NUM  : return 9;
+            case QRMode.MODE_8BIT_BYTE  : return 8;
+            case QRMode.MODE_KANJI      : return 8;
+            default :
+                throw new Error("mode:" + mode);
+            }
+
+        } else if (type < 27) {
+
+            // 10 - 26
+
+            switch(mode) {
+            case QRMode.MODE_NUMBER     : return 12;
+            case QRMode.MODE_ALPHA_NUM  : return 11;
+            case QRMode.MODE_8BIT_BYTE  : return 16;
+            case QRMode.MODE_KANJI      : return 10;
+            default :
+                throw new Error("mode:" + mode);
+            }
+
+        } else if (type < 41) {
+
+            // 27 - 40
+
+            switch(mode) {
+            case QRMode.MODE_NUMBER     : return 14;
+            case QRMode.MODE_ALPHA_NUM  : return 13;
+            case QRMode.MODE_8BIT_BYTE  : return 16;
+            case QRMode.MODE_KANJI      : return 12;
+            default :
+                throw new Error("mode:" + mode);
+            }
+
+        } else {
+            throw new Error("type:" + type);
+        }
+    },
+
+    getLostPoint : function(qrCode) {
+        
+        var moduleCount = qrCode.getModuleCount();
+        var lostPoint = 0;
+        var row = 0; 
+        var col = 0;
+
+        
+        // LEVEL1
+        
+        for (row = 0; row < moduleCount; row++) {
+
+            for (col = 0; col < moduleCount; col++) {
+
+                var sameCount = 0;
+                var dark = qrCode.isDark(row, col);
+
+                for (var r = -1; r <= 1; r++) {
+
+                    if (row + r < 0 || moduleCount <= row + r) {
+                        continue;
+                    }
+
+                    for (var c = -1; c <= 1; c++) {
+
+                        if (col + c < 0 || moduleCount <= col + c) {
+                            continue;
+                        }
+
+                        if (r === 0 && c === 0) {
+                            continue;
+                        }
+
+                        if (dark === qrCode.isDark(row + r, col + c) ) {
+                            sameCount++;
+                        }
+                    }
+                }
+
+                if (sameCount > 5) {
+                    lostPoint += (3 + sameCount - 5);
+                }
+            }
+        }
+
+        // LEVEL2
+
+        for (row = 0; row < moduleCount - 1; row++) {
+            for (col = 0; col < moduleCount - 1; col++) {
+                var count = 0;
+                if (qrCode.isDark(row,     col    ) ) count++;
+                if (qrCode.isDark(row + 1, col    ) ) count++;
+                if (qrCode.isDark(row,     col + 1) ) count++;
+                if (qrCode.isDark(row + 1, col + 1) ) count++;
+                if (count === 0 || count === 4) {
+                    lostPoint += 3;
+                }
+            }
+        }
+
+        // LEVEL3
+
+        for (row = 0; row < moduleCount; row++) {
+            for (col = 0; col < moduleCount - 6; col++) {
+                if (qrCode.isDark(row, col) && 
+                        !qrCode.isDark(row, col + 1) && 
+                         qrCode.isDark(row, col + 2) && 
+                         qrCode.isDark(row, col + 3) && 
+                         qrCode.isDark(row, col + 4) && 
+                        !qrCode.isDark(row, col + 5) && 
+                         qrCode.isDark(row, col + 6) ) {
+                    lostPoint += 40;
+                }
+            }
+        }
+
+        for (col = 0; col < moduleCount; col++) {
+            for (row = 0; row < moduleCount - 6; row++) {
+                if (qrCode.isDark(row, col) &&
+                        !qrCode.isDark(row + 1, col) &&
+                         qrCode.isDark(row + 2, col) &&
+                         qrCode.isDark(row + 3, col) &&
+                         qrCode.isDark(row + 4, col) &&
+                        !qrCode.isDark(row + 5, col) &&
+                         qrCode.isDark(row + 6, col) ) {
+                    lostPoint += 40;
+                }
+            }
+        }
+
+        // LEVEL4
+        
+        var darkCount = 0;
+
+        for (col = 0; col < moduleCount; col++) {
+            for (row = 0; row < moduleCount; row++) {
+                if (qrCode.isDark(row, col) ) {
+                    darkCount++;
+                }
+            }
+        }
+        
+        var ratio = Math.abs(100 * darkCount / moduleCount / moduleCount - 50) / 5;
+        lostPoint += ratio * 10;
+
+        return lostPoint;       
+    }
+
+};
+
+
+
+function QRRSBlock(totalCount, dataCount) {
+	this.totalCount = totalCount;
+	this.dataCount  = dataCount;
+}
+
+QRRSBlock.RS_BLOCK_TABLE = [
+
+	// L
+	// M
+	// Q
+	// H
+
+	// 1
+	[1, 26, 19],
+	[1, 26, 16],
+	[1, 26, 13],
+	[1, 26, 9],
+	
+	// 2
+	[1, 44, 34],
+	[1, 44, 28],
+	[1, 44, 22],
+	[1, 44, 16],
+
+	// 3
+	[1, 70, 55],
+	[1, 70, 44],
+	[2, 35, 17],
+	[2, 35, 13],
+
+	// 4		
+	[1, 100, 80],
+	[2, 50, 32],
+	[2, 50, 24],
+	[4, 25, 9],
+	
+	// 5
+	[1, 134, 108],
+	[2, 67, 43],
+	[2, 33, 15, 2, 34, 16],
+	[2, 33, 11, 2, 34, 12],
+	
+	// 6
+	[2, 86, 68],
+	[4, 43, 27],
+	[4, 43, 19],
+	[4, 43, 15],
+	
+	// 7		
+	[2, 98, 78],
+	[4, 49, 31],
+	[2, 32, 14, 4, 33, 15],
+	[4, 39, 13, 1, 40, 14],
+	
+	// 8
+	[2, 121, 97],
+	[2, 60, 38, 2, 61, 39],
+	[4, 40, 18, 2, 41, 19],
+	[4, 40, 14, 2, 41, 15],
+	
+	// 9
+	[2, 146, 116],
+	[3, 58, 36, 2, 59, 37],
+	[4, 36, 16, 4, 37, 17],
+	[4, 36, 12, 4, 37, 13],
+	
+	// 10		
+	[2, 86, 68, 2, 87, 69],
+	[4, 69, 43, 1, 70, 44],
+	[6, 43, 19, 2, 44, 20],
+	[6, 43, 15, 2, 44, 16],
+
+	// 11
+	[4, 101, 81],
+	[1, 80, 50, 4, 81, 51],
+	[4, 50, 22, 4, 51, 23],
+	[3, 36, 12, 8, 37, 13],
+
+	// 12
+	[2, 116, 92, 2, 117, 93],
+	[6, 58, 36, 2, 59, 37],
+	[4, 46, 20, 6, 47, 21],
+	[7, 42, 14, 4, 43, 15],
+
+	// 13
+	[4, 133, 107],
+	[8, 59, 37, 1, 60, 38],
+	[8, 44, 20, 4, 45, 21],
+	[12, 33, 11, 4, 34, 12],
+
+	// 14
+	[3, 145, 115, 1, 146, 116],
+	[4, 64, 40, 5, 65, 41],
+	[11, 36, 16, 5, 37, 17],
+	[11, 36, 12, 5, 37, 13],
+
+	// 15
+	[5, 109, 87, 1, 110, 88],
+	[5, 65, 41, 5, 66, 42],
+	[5, 54, 24, 7, 55, 25],
+	[11, 36, 12],
+
+	// 16
+	[5, 122, 98, 1, 123, 99],
+	[7, 73, 45, 3, 74, 46],
+	[15, 43, 19, 2, 44, 20],
+	[3, 45, 15, 13, 46, 16],
+
+	// 17
+	[1, 135, 107, 5, 136, 108],
+	[10, 74, 46, 1, 75, 47],
+	[1, 50, 22, 15, 51, 23],
+	[2, 42, 14, 17, 43, 15],
+
+	// 18
+	[5, 150, 120, 1, 151, 121],
+	[9, 69, 43, 4, 70, 44],
+	[17, 50, 22, 1, 51, 23],
+	[2, 42, 14, 19, 43, 15],
+
+	// 19
+	[3, 141, 113, 4, 142, 114],
+	[3, 70, 44, 11, 71, 45],
+	[17, 47, 21, 4, 48, 22],
+	[9, 39, 13, 16, 40, 14],
+
+	// 20
+	[3, 135, 107, 5, 136, 108],
+	[3, 67, 41, 13, 68, 42],
+	[15, 54, 24, 5, 55, 25],
+	[15, 43, 15, 10, 44, 16],
+
+	// 21
+	[4, 144, 116, 4, 145, 117],
+	[17, 68, 42],
+	[17, 50, 22, 6, 51, 23],
+	[19, 46, 16, 6, 47, 17],
+
+	// 22
+	[2, 139, 111, 7, 140, 112],
+	[17, 74, 46],
+	[7, 54, 24, 16, 55, 25],
+	[34, 37, 13],
+
+	// 23
+	[4, 151, 121, 5, 152, 122],
+	[4, 75, 47, 14, 76, 48],
+	[11, 54, 24, 14, 55, 25],
+	[16, 45, 15, 14, 46, 16],
+
+	// 24
+	[6, 147, 117, 4, 148, 118],
+	[6, 73, 45, 14, 74, 46],
+	[11, 54, 24, 16, 55, 25],
+	[30, 46, 16, 2, 47, 17],
+
+	// 25
+	[8, 132, 106, 4, 133, 107],
+	[8, 75, 47, 13, 76, 48],
+	[7, 54, 24, 22, 55, 25],
+	[22, 45, 15, 13, 46, 16],
+
+	// 26
+	[10, 142, 114, 2, 143, 115],
+	[19, 74, 46, 4, 75, 47],
+	[28, 50, 22, 6, 51, 23],
+	[33, 46, 16, 4, 47, 17],
+
+	// 27
+	[8, 152, 122, 4, 153, 123],
+	[22, 73, 45, 3, 74, 46],
+	[8, 53, 23, 26, 54, 24],
+	[12, 45, 15, 28, 46, 16],
+
+	// 28
+	[3, 147, 117, 10, 148, 118],
+	[3, 73, 45, 23, 74, 46],
+	[4, 54, 24, 31, 55, 25],
+	[11, 45, 15, 31, 46, 16],
+
+	// 29
+	[7, 146, 116, 7, 147, 117],
+	[21, 73, 45, 7, 74, 46],
+	[1, 53, 23, 37, 54, 24],
+	[19, 45, 15, 26, 46, 16],
+
+	// 30
+	[5, 145, 115, 10, 146, 116],
+	[19, 75, 47, 10, 76, 48],
+	[15, 54, 24, 25, 55, 25],
+	[23, 45, 15, 25, 46, 16],
+
+	// 31
+	[13, 145, 115, 3, 146, 116],
+	[2, 74, 46, 29, 75, 47],
+	[42, 54, 24, 1, 55, 25],
+	[23, 45, 15, 28, 46, 16],
+
+	// 32
+	[17, 145, 115],
+	[10, 74, 46, 23, 75, 47],
+	[10, 54, 24, 35, 55, 25],
+	[19, 45, 15, 35, 46, 16],
+
+	// 33
+	[17, 145, 115, 1, 146, 116],
+	[14, 74, 46, 21, 75, 47],
+	[29, 54, 24, 19, 55, 25],
+	[11, 45, 15, 46, 46, 16],
+
+	// 34
+	[13, 145, 115, 6, 146, 116],
+	[14, 74, 46, 23, 75, 47],
+	[44, 54, 24, 7, 55, 25],
+	[59, 46, 16, 1, 47, 17],
+
+	// 35
+	[12, 151, 121, 7, 152, 122],
+	[12, 75, 47, 26, 76, 48],
+	[39, 54, 24, 14, 55, 25],
+	[22, 45, 15, 41, 46, 16],
+
+	// 36
+	[6, 151, 121, 14, 152, 122],
+	[6, 75, 47, 34, 76, 48],
+	[46, 54, 24, 10, 55, 25],
+	[2, 45, 15, 64, 46, 16],
+
+	// 37
+	[17, 152, 122, 4, 153, 123],
+	[29, 74, 46, 14, 75, 47],
+	[49, 54, 24, 10, 55, 25],
+	[24, 45, 15, 46, 46, 16],
+
+	// 38
+	[4, 152, 122, 18, 153, 123],
+	[13, 74, 46, 32, 75, 47],
+	[48, 54, 24, 14, 55, 25],
+	[42, 45, 15, 32, 46, 16],
+
+	// 39
+	[20, 147, 117, 4, 148, 118],
+	[40, 75, 47, 7, 76, 48],
+	[43, 54, 24, 22, 55, 25],
+	[10, 45, 15, 67, 46, 16],
+
+	// 40
+	[19, 148, 118, 6, 149, 119],
+	[18, 75, 47, 31, 76, 48],
+	[34, 54, 24, 34, 55, 25],
+	[20, 45, 15, 61, 46, 16]
+];
+
+QRRSBlock.getRSBlocks = function(typeNumber, errorCorrectLevel) {
+	
+	var rsBlock = QRRSBlock.getRsBlockTable(typeNumber, errorCorrectLevel);
+	
+	if (rsBlock === undefined) {
+		throw new Error("bad rs block @ typeNumber:" + typeNumber + "/errorCorrectLevel:" + errorCorrectLevel);
+	}
+
+	var length = rsBlock.length / 3;
+	
+	var list = [];
+	
+	for (var i = 0; i < length; i++) {
+
+		var count = rsBlock[i * 3 + 0];
+		var totalCount = rsBlock[i * 3 + 1];
+		var dataCount  = rsBlock[i * 3 + 2];
+
+		for (var j = 0; j < count; j++) {
+			list.push(new QRRSBlock(totalCount, dataCount) );	
+		}
+	}
+	
+	return list;
+};
+
+QRRSBlock.getRsBlockTable = function(typeNumber, errorCorrectLevel) {
+
+	switch(errorCorrectLevel) {
+	case QRErrorCorrectLevel.L :
+		return QRRSBlock.RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 0];
+	case QRErrorCorrectLevel.M :
+		return QRRSBlock.RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 1];
+	case QRErrorCorrectLevel.Q :
+		return QRRSBlock.RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 2];
+	case QRErrorCorrectLevel.H :
+		return QRRSBlock.RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 3];
+	default :
+		return undefined;
+	}
+};
+
+
+function QRBitBuffer() {
+	this.buffer = [];
+	this.length = 0;
+}
+
+QRBitBuffer.prototype = {
+
+	get : function(index) {
+		var bufIndex = Math.floor(index / 8);
+		return ( (this.buffer[bufIndex] >>> (7 - index % 8) ) & 1) == 1;
+	},
+	
+	put : function(num, length) {
+		for (var i = 0; i < length; i++) {
+			this.putBit( ( (num >>> (length - i - 1) ) & 1) == 1);
+		}
+	},
+	
+	getLengthInBits : function() {
+		return this.length;
+	},
+	
+	putBit : function(bit) {
+	
+		var bufIndex = Math.floor(this.length / 8);
+		if (this.buffer.length <= bufIndex) {
+			this.buffer.push(0);
+		}
+	
+		if (bit) {
+			this.buffer[bufIndex] |= (0x80 >>> (this.length % 8) );
+		}
+	
+		this.length++;
+	}
+};
+
+
+
+function QR8bitByte(data) {
+	this.mode = QRMode.MODE_8BIT_BYTE;
+	this.data = data;
+}
+
+QR8bitByte.prototype = {
+
+	getLength : function() {
+		return this.data.length;
+	},
+	
+	write : function(buffer) {
+		for (var i = 0; i < this.data.length; i++) {
+			// not JIS ...
+			buffer.put(this.data.charCodeAt(i), 8);
+		}
+	}
+};
+
+
+//---------------------------------------------------------------------
+// QRCode for JavaScript
+//
+// Copyright (c) 2009 Kazuhiko Arase
+//
+// URL: http://www.d-project.com/
+//
+// Licensed under the MIT license:
+//   http://www.opensource.org/licenses/mit-license.php
+//
+// The word "QR Code" is registered trademark of 
+// DENSO WAVE INCORPORATED
+//   http://www.denso-wave.com/qrcode/faqpatent-e.html
+//
+//---------------------------------------------------------------------
+// Modified to work in node for this project (and some refactoring)
+//---------------------------------------------------------------------
+
+
+function QRCode(typeNumber, errorCorrectLevel) {
+	this.typeNumber = typeNumber;
+	this.errorCorrectLevel = errorCorrectLevel;
+	this.modules = null;
+	this.moduleCount = 0;
+	this.dataCache = null;
+	this.dataList = [];
+}
+
+QRCode.prototype = {
+	
+	addData : function(data) {
+		var newData = new QR8bitByte(data);
+		this.dataList.push(newData);
+		this.dataCache = null;
+	},
+	
+	isDark : function(row, col) {
+		if (row < 0 || this.moduleCount <= row || col < 0 || this.moduleCount <= col) {
+			throw new Error(row + "," + col);
+		}
+		return this.modules[row][col];
+	},
+
+	getModuleCount : function() {
+		return this.moduleCount;
+	},
+	
+	make : function() {
+		// Calculate automatically typeNumber if provided is < 1
+		if (this.typeNumber < 1 ){
+			var typeNumber = 1;
+			for (typeNumber = 1; typeNumber < 40; typeNumber++) {
+				var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, this.errorCorrectLevel);
+
+				var buffer = new QRBitBuffer();
+				var totalDataCount = 0;
+				for (var i = 0; i < rsBlocks.length; i++) {
+					totalDataCount += rsBlocks[i].dataCount;
+				}
+
+				for (var x = 0; x < this.dataList.length; x++) {
+					var data = this.dataList[x];
+					buffer.put(data.mode, 4);
+					buffer.put(data.getLength(), QRUtil.getLengthInBits(data.mode, typeNumber) );
+					data.write(buffer);
+				}
+				if (buffer.getLengthInBits() <= totalDataCount * 8)
+					break;
+			}
+			this.typeNumber = typeNumber;
+		}
+		this.makeImpl(false, this.getBestMaskPattern() );
+	},
+	
+	makeImpl : function(test, maskPattern) {
+		
+		this.moduleCount = this.typeNumber * 4 + 17;
+		this.modules = new Array(this.moduleCount);
+		
+		for (var row = 0; row < this.moduleCount; row++) {
+			
+			this.modules[row] = new Array(this.moduleCount);
+			
+			for (var col = 0; col < this.moduleCount; col++) {
+				this.modules[row][col] = null;//(col + row) % 3;
+			}
+		}
+	
+		this.setupPositionProbePattern(0, 0);
+		this.setupPositionProbePattern(this.moduleCount - 7, 0);
+		this.setupPositionProbePattern(0, this.moduleCount - 7);
+		this.setupPositionAdjustPattern();
+		this.setupTimingPattern();
+		this.setupTypeInfo(test, maskPattern);
+		
+		if (this.typeNumber >= 7) {
+			this.setupTypeNumber(test);
+		}
+	
+		if (this.dataCache === null) {
+			this.dataCache = QRCode.createData(this.typeNumber, this.errorCorrectLevel, this.dataList);
+		}
+	
+		this.mapData(this.dataCache, maskPattern);
+	},
+
+	setupPositionProbePattern : function(row, col)  {
+		
+		for (var r = -1; r <= 7; r++) {
+			
+			if (row + r <= -1 || this.moduleCount <= row + r) continue;
+			
+			for (var c = -1; c <= 7; c++) {
+				
+				if (col + c <= -1 || this.moduleCount <= col + c) continue;
+				
+				if ( (0 <= r && r <= 6 && (c === 0 || c === 6) ) || 
+                     (0 <= c && c <= 6 && (r === 0 || r === 6) ) || 
+                     (2 <= r && r <= 4 && 2 <= c && c <= 4) ) {
+					this.modules[row + r][col + c] = true;
+				} else {
+					this.modules[row + r][col + c] = false;
+				}
+			}		
+		}		
+	},
+	
+	getBestMaskPattern : function() {
+	
+		var minLostPoint = 0;
+		var pattern = 0;
+	
+		for (var i = 0; i < 8; i++) {
+			
+			this.makeImpl(true, i);
+	
+			var lostPoint = QRUtil.getLostPoint(this);
+	
+			if (i === 0 || minLostPoint >  lostPoint) {
+				minLostPoint = lostPoint;
+				pattern = i;
+			}
+		}
+	
+		return pattern;
+	},
+	
+	createMovieClip : function(target_mc, instance_name, depth) {
+	
+		var qr_mc = target_mc.createEmptyMovieClip(instance_name, depth);
+		var cs = 1;
+	
+		this.make();
+
+		for (var row = 0; row < this.modules.length; row++) {
+			
+			var y = row * cs;
+			
+			for (var col = 0; col < this.modules[row].length; col++) {
+	
+				var x = col * cs;
+				var dark = this.modules[row][col];
+			
+				if (dark) {
+					qr_mc.beginFill(0, 100);
+					qr_mc.moveTo(x, y);
+					qr_mc.lineTo(x + cs, y);
+					qr_mc.lineTo(x + cs, y + cs);
+					qr_mc.lineTo(x, y + cs);
+					qr_mc.endFill();
+				}
+			}
+		}
+		
+		return qr_mc;
+	},
+
+	setupTimingPattern : function() {
+		
+		for (var r = 8; r < this.moduleCount - 8; r++) {
+			if (this.modules[r][6] !== null) {
+				continue;
+			}
+			this.modules[r][6] = (r % 2 === 0);
+		}
+	
+		for (var c = 8; c < this.moduleCount - 8; c++) {
+			if (this.modules[6][c] !== null) {
+				continue;
+			}
+			this.modules[6][c] = (c % 2 === 0);
+		}
+	},
+	
+	setupPositionAdjustPattern : function() {
+	
+		var pos = QRUtil.getPatternPosition(this.typeNumber);
+		
+		for (var i = 0; i < pos.length; i++) {
+		
+			for (var j = 0; j < pos.length; j++) {
+			
+				var row = pos[i];
+				var col = pos[j];
+				
+				if (this.modules[row][col] !== null) {
+					continue;
+				}
+				
+				for (var r = -2; r <= 2; r++) {
+				
+					for (var c = -2; c <= 2; c++) {
+					
+						if (Math.abs(r) === 2 || 
+                            Math.abs(c) === 2 ||
+                            (r === 0 && c === 0) ) {
+							this.modules[row + r][col + c] = true;
+						} else {
+							this.modules[row + r][col + c] = false;
+						}
+					}
+				}
+			}
+		}
+	},
+	
+	setupTypeNumber : function(test) {
+	
+		var bits = QRUtil.getBCHTypeNumber(this.typeNumber);
+        var mod;
+	
+		for (var i = 0; i < 18; i++) {
+			mod = (!test && ( (bits >> i) & 1) === 1);
+			this.modules[Math.floor(i / 3)][i % 3 + this.moduleCount - 8 - 3] = mod;
+		}
+	
+		for (var x = 0; x < 18; x++) {
+			mod = (!test && ( (bits >> x) & 1) === 1);
+			this.modules[x % 3 + this.moduleCount - 8 - 3][Math.floor(x / 3)] = mod;
+		}
+	},
+	
+	setupTypeInfo : function(test, maskPattern) {
+	
+		var data = (this.errorCorrectLevel << 3) | maskPattern;
+		var bits = QRUtil.getBCHTypeInfo(data);
+        var mod;
+	
+		// vertical		
+		for (var v = 0; v < 15; v++) {
+	
+			mod = (!test && ( (bits >> v) & 1) === 1);
+	
+			if (v < 6) {
+				this.modules[v][8] = mod;
+			} else if (v < 8) {
+				this.modules[v + 1][8] = mod;
+			} else {
+				this.modules[this.moduleCount - 15 + v][8] = mod;
+			}
+		}
+	
+		// horizontal
+		for (var h = 0; h < 15; h++) {
+	
+			mod = (!test && ( (bits >> h) & 1) === 1);
+			
+			if (h < 8) {
+				this.modules[8][this.moduleCount - h - 1] = mod;
+			} else if (h < 9) {
+				this.modules[8][15 - h - 1 + 1] = mod;
+			} else {
+				this.modules[8][15 - h - 1] = mod;
+			}
+		}
+	
+		// fixed module
+		this.modules[this.moduleCount - 8][8] = (!test);
+	
+	},
+	
+	mapData : function(data, maskPattern) {
+		
+		var inc = -1;
+		var row = this.moduleCount - 1;
+		var bitIndex = 7;
+		var byteIndex = 0;
+		
+		for (var col = this.moduleCount - 1; col > 0; col -= 2) {
+	
+			if (col === 6) col--;
+	
+			while (true) {
+	
+				for (var c = 0; c < 2; c++) {
+					
+					if (this.modules[row][col - c] === null) {
+						
+						var dark = false;
+	
+						if (byteIndex < data.length) {
+							dark = ( ( (data[byteIndex] >>> bitIndex) & 1) === 1);
+						}
+	
+						var mask = QRUtil.getMask(maskPattern, row, col - c);
+	
+						if (mask) {
+							dark = !dark;
+						}
+						
+						this.modules[row][col - c] = dark;
+						bitIndex--;
+	
+						if (bitIndex === -1) {
+							byteIndex++;
+							bitIndex = 7;
+						}
+					}
+				}
+								
+				row += inc;
+	
+				if (row < 0 || this.moduleCount <= row) {
+					row -= inc;
+					inc = -inc;
+					break;
+				}
+			}
+		}
+		
+	}
+
+};
+
+QRCode.PAD0 = 0xEC;
+QRCode.PAD1 = 0x11;
+
+QRCode.createData = function(typeNumber, errorCorrectLevel, dataList) {
+	
+	var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, errorCorrectLevel);
+	
+	var buffer = new QRBitBuffer();
+	
+	for (var i = 0; i < dataList.length; i++) {
+		var data = dataList[i];
+		buffer.put(data.mode, 4);
+		buffer.put(data.getLength(), QRUtil.getLengthInBits(data.mode, typeNumber) );
+		data.write(buffer);
+	}
+
+	// calc num max data.
+	var totalDataCount = 0;
+	for (var x = 0; x < rsBlocks.length; x++) {
+		totalDataCount += rsBlocks[x].dataCount;
+	}
+
+	if (buffer.getLengthInBits() > totalDataCount * 8) {
+		throw new Error("code length overflow. (" + 
+            buffer.getLengthInBits() + 
+            ">" +  
+            totalDataCount * 8 + 
+            ")");
+	}
+
+	// end code
+	if (buffer.getLengthInBits() + 4 <= totalDataCount * 8) {
+		buffer.put(0, 4);
+	}
+
+	// padding
+	while (buffer.getLengthInBits() % 8 !== 0) {
+		buffer.putBit(false);
+	}
+
+	// padding
+	while (true) {
+		
+		if (buffer.getLengthInBits() >= totalDataCount * 8) {
+			break;
+		}
+		buffer.put(QRCode.PAD0, 8);
+		
+		if (buffer.getLengthInBits() >= totalDataCount * 8) {
+			break;
+		}
+		buffer.put(QRCode.PAD1, 8);
+	}
+
+	return QRCode.createBytes(buffer, rsBlocks);
+};
+
+QRCode.createBytes = function(buffer, rsBlocks) {
+
+	var offset = 0;
+	
+	var maxDcCount = 0;
+	var maxEcCount = 0;
+	
+	var dcdata = new Array(rsBlocks.length);
+	var ecdata = new Array(rsBlocks.length);
+	
+	for (var r = 0; r < rsBlocks.length; r++) {
+
+		var dcCount = rsBlocks[r].dataCount;
+		var ecCount = rsBlocks[r].totalCount - dcCount;
+
+		maxDcCount = Math.max(maxDcCount, dcCount);
+		maxEcCount = Math.max(maxEcCount, ecCount);
+		
+		dcdata[r] = new Array(dcCount);
+		
+		for (var i = 0; i < dcdata[r].length; i++) {
+			dcdata[r][i] = 0xff & buffer.buffer[i + offset];
+		}
+		offset += dcCount;
+		
+		var rsPoly = QRUtil.getErrorCorrectPolynomial(ecCount);
+		var rawPoly = new QRPolynomial(dcdata[r], rsPoly.getLength() - 1);
+
+		var modPoly = rawPoly.mod(rsPoly);
+		ecdata[r] = new Array(rsPoly.getLength() - 1);
+		for (var x = 0; x < ecdata[r].length; x++) {
+            var modIndex = x + modPoly.getLength() - ecdata[r].length;
+			ecdata[r][x] = (modIndex >= 0)? modPoly.get(modIndex) : 0;
+		}
+
+	}
+	
+	var totalCodeCount = 0;
+	for (var y = 0; y < rsBlocks.length; y++) {
+		totalCodeCount += rsBlocks[y].totalCount;
+	}
+
+	var data = new Array(totalCodeCount);
+	var index = 0;
+
+	for (var z = 0; z < maxDcCount; z++) {
+		for (var s = 0; s < rsBlocks.length; s++) {
+			if (z < dcdata[s].length) {
+				data[index++] = dcdata[s][z];
+			}
+		}
+	}
+
+	for (var xx = 0; xx < maxEcCount; xx++) {
+		for (var t = 0; t < rsBlocks.length; t++) {
+			if (xx < ecdata[t].length) {
+				data[index++] = ecdata[t][xx];
+			}
+		}
+	}
+
+	return data;
+
+};
+
+
+return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(text); q.make(); return q; };
+})();
+  var DEFAULTS = {"causesNonPlanifie": ["Panne mécanique", "Panne électrique", "Alarme CN / défaut commande", "Casse outil", "Usure outil (changement imprévu)", "Réglage/Changement outil", "Problème de bridage / montage", "Manque matière première", "Attente outil / porte-outil", "Attente programme CN", "Attente régleur", "Attente validation 1ère pièce", "Pièce non conforme / retouche", "Attente opérateur", "Manque air / énergie", "Liquide de coupe / copeaux", "Incident/Accident"], "causesPlanifie": ["Changement de série", "Montage / démontage outillage", "Pré-réglage outils", "Prise d'origine / palpage", "Contrôle 1ère pièce (FAI)", "Essai / mise au point programme", "Maintenance préventive", "Nettoyage machine / 5S", "Pause réglementaire", "Repas", "Réunion qualité", "Formation"], "machines": ["MORI SEIKI 3 axes SV-50 (FNV3-01)", "DOOSAN 4 axes DNM 6700 (FNV04-01)", "DOOSAN 3 axes DNM 5700 (FNV3-02)", "DOOSAN 4 axes NHP 5500 (FNH4-01)", "DOOSAN 3 axes PUMA GT 2600M (TCN3G)", "DOOSAN 3 axes PUMA DTN 2600M (TCN3D)", "DOOSAN 2 axes LYNX 2100 (TCN2)", "Tour conventionnelle (TCV)"], "lignes": ["Ligne Tournage", "Ligne Fraisage", "Qualité", "Magasin Produit fini", "Magasin Matière & Outillage"], "equipes": ["Matin", "Après-midi", "Nuit"]};
+  var K_CFG = "arretsAtelier_firebase", K_POSTE = "arretsAtelier_poste", K_VIEW = "arretsAtelier_view";
+  var SAFE = "BCDEFGHIJKLNOPRSTUVXY", FIN = "PXFIN";
+
+  function qs(s){ return document.querySelector(s); }
+  function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return { "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]; }); }
+  function ls(k, v){ try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null"); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch(e){ return null; } }
+  function fmtNum(n, d){ return Number(n || 0).toLocaleString("fr-FR", { maximumFractionDigits: d == null ? 0 : d }); }
+  function dISO(d){ d = d || new Date(); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+  function fmtDate(s){ var p = String(s||"").split("-"); return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : s; }
+  function hm(iso){ if (!iso) return "—"; var d = new Date(iso); return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0"); }
+  function elapsed(ms){ var s = Math.max(0, Math.floor(ms/1000)), h = Math.floor(s/3600), m = Math.floor((s%3600)/60), x = s%60; return (h ? h + ":" + String(m).padStart(2,"0") : String(m)) + ":" + String(x).padStart(2,"0"); }
+  var toastT = null;
+  function toast(t, err){ var el = qs(".toast") || document.body.appendChild(Object.assign(document.createElement("div"), { className: "toast" })); el.textContent = t; el.className = "toast" + (err ? " err" : ""); el.hidden = false; clearTimeout(toastT); toastT = setTimeout(function(){ el.hidden = true; }, 4500); }
+  function beep(ok){ try { var C = window.AudioContext || window.webkitAudioContext; if (!C) return; beep.c = beep.c || new C(); var o = beep.c.createOscillator(), g = beep.c.createGain(); o.frequency.value = ok ? 1200 : 300; g.gain.value = 0.15; o.connect(g); g.connect(beep.c.destination); o.start(); o.stop(beep.c.currentTime + (ok ? 0.12 : 0.4)); } catch(e){} }
+
+  function hash4(s){ s = String(s == null ? "" : s).trim().toLowerCase(); var h = 2166136261; for (var i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } var o = ""; for (var k = 0; k < 4; k++){ o += SAFE.charAt(h % 21); h = Math.floor(h / 21); } return o; }
+  function codeCause(type, c){ return "PX" + (type === "Planifié" ? "P" : "N") + hash4(c); }
+  function codeMachine(m){ return "PXK" + hash4(m); }
+
+  // ---------- Configuration Firebase (résiste à la traduction automatique de Chrome) ----------
+  function parseFirebaseConfig(txt){
+    txt = String(txt || "");
+    var api = (txt.match(/AIza[0-9A-Za-z_\-]{30,}/) || [])[0];
+    var dom = (txt.match(/[a-z0-9\-]+\.firebaseapp\.com/i) || [])[0];
+    var app = (txt.match(/1:\d+:web:[0-9a-f]+/i) || [])[0];
+    var bucket = (txt.match(/[a-z0-9\-]+\.(appspot\.com|firebasestorage\.app)/i) || [])[0];
+    var pid = dom ? dom.replace(/\.firebaseapp\.com$/i, "") : (txt.match(/projectId\s*:\s*["']([^"']+)/) || [])[1];
+    if (!api || !pid || !app) return null;
+    return { apiKey: api, authDomain: dom || pid + ".firebaseapp.com", projectId: pid, storageBucket: bucket || pid + ".appspot.com", messagingSenderId: app.split(":")[1], appId: app };
+  }
+
+  var db = null, state = { arrets: [], lists: JSON.parse(JSON.stringify(DEFAULTS)), ready: false };
+  var poste = ls(K_POSTE) || (EMBED_OPTS && EMBED_OPTS.poste) || {};
+  var view = location.hash === "#scan" ? "poste" : location.hash === "#suivi" ? "suivi" : (ls(K_VIEW) || (EMBED_OPTS && EMBED_OPTS.view) || "suivi");
+  if (EMBED_OPTS && EMBED_OPTS.lock){ qs('.tab[data-view="params"]').hidden = true; if (view === "params") view = EMBED_OPTS.view || "poste"; }
+  // Lien d'un QR machine : …#poste-fnv3-01 (code machine entre parenthèses). La tablette se règle
+  // sur cette machine (ligne déduite : code F… = Ligne Fraisage, T… = Ligne Tournage) et ouvre le poste.
+  function posteFromHash(){
+    var m = /^#poste-([a-z0-9-]+)$/i.exec(location.hash || "");
+    if (!m) return false;
+    var code = m[1].toLowerCase();
+    var list = (state.lists && state.lists.machines && state.lists.machines.length ? state.lists.machines : DEFAULTS.machines);
+    var mach = list.filter(function(x){ var c = /\(([^)]+)\)/.exec(x); return c && c[1].toLowerCase() === code; })[0];
+    if (!mach) return false;
+    var ligne = /^f/i.test(code) ? "Ligne Fraisage" : /^t/i.test(code) ? "Ligne Tournage" : (poste.ligne || "");
+    poste = { machine: mach, ligne: ligne, equipe: poste.machine === mach ? (poste.equipe || "") : (poste.equipe || "") };
+    ls(K_POSTE, poste);
+    view = "poste";
+    return true;
+  }
+  posteFromHash();
+  window.addEventListener("hashchange", function(){ if (posteFromHash()) show("poste"); else if (location.hash === "#suivi") show("suivi"); else if (location.hash === "#scan") show("poste"); });
+
+  function connect(){
+    var cfg = EMBED_CONFIG || ls(K_CFG);
+    if (!cfg){ show("setup"); return; }
+    if (!window.firebase){ setConn("off", "Firebase non chargé — vérifiez Internet"); show("setup"); qs("#cfgErr").textContent = "Les bibliothèques Firebase ne se chargent pas : il faut une connexion Internet."; return; }
+    try { firebase.initializeApp(cfg); } catch(e){ if (!/already exists/.test(e.message)){ qs("#cfgErr").textContent = e.message; show("setup"); return; } }
+    db = firebase.firestore();
+    try { db.enablePersistence({ synchronizeTabs: true }).catch(function(){}); } catch(e){}
+    qs("#fbInfo").textContent = "Projet : " + cfg.projectId + (EMBED_CONFIG ? " (intégré au fichier)" : " (mémorisé sur cet appareil)");
+    qs("#fbReset").hidden = !!EMBED_CONFIG;
+    setConn("", "Connexion…");
+    firebase.auth().signInAnonymously().then(function(){
+      setConn("on", "En direct — " + cfg.projectId);
+      listen();
+    }).catch(function(e){
+      setConn("off", "Connexion refusée");
+      toast("Firebase : " + (e.code === "auth/operation-not-allowed" ? "activez Authentication → Anonyme." : e.message), true);
+    });
+    show(view);
+  }
+  function setConn(cls, t){ var el = qs("#conn"); el.className = "conn " + cls; el.textContent = t; }
+  window.addEventListener("online", function(){ if (db) setConn("on", "En direct"); });
+  window.addEventListener("offline", function(){ setConn("off", "Hors ligne — les scans partiront au retour d'Internet"); });
+
+  var seenOpen = null, newIds = {};
+  function listen(){
+    db.doc("config/arrets").onSnapshot(function(s){
+      if (s.exists){
+        var d = s.data();
+        // Mise à jour unique : parc machines réel de l'atelier.
+        if ((d.machinesVersion || 0) < 2){ d.machines = DEFAULTS.machines.slice(); db.doc("config/arrets").set({ machines: d.machines, machinesVersion: 2 }, { merge: true }).catch(function(){}); }
+        if ((d.lignesVersion || 0) < 2){ d.lignes = DEFAULTS.lignes.slice(); db.doc("config/arrets").set({ lignes: d.lignes, lignesVersion: 2 }, { merge: true }).catch(function(){}); }
+        Object.keys(DEFAULTS).forEach(function(k){ if (Array.isArray(d[k]) && d[k].length) state.lists[k] = d[k]; });
+      }
+      else db.doc("config/arrets").set(Object.assign({ machinesVersion: 2, lignesVersion: 2 }, DEFAULTS)).catch(function(){});
+      fillParams(); renderAll();
+    }, function(e){ toast("Lecture config : " + e.message, true); });
+    db.collection("arrets").orderBy("debut", "desc").limit(3000).onSnapshot(function(snap){
+      state.arrets = snap.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; });
+      state.ready = true;
+      var open = state.arrets.filter(function(a){ return a.statut === "En cours"; });
+      if (seenOpen === null){ seenOpen = {}; open.forEach(function(a){ seenOpen[a.id] = 1; }); }
+      else {
+        var fresh = open.filter(function(a){ return !seenOpen[a.id]; });
+        open.forEach(function(a){ seenOpen[a.id] = 1; });
+        if (fresh.length && view === "suivi"){
+          fresh.forEach(function(a){ newIds[a.id] = Date.now(); });
+          try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch(e){}
+          beep(false);
+          toast("Nouvel arrêt : " + fresh.map(function(a){ return a.machine + " — " + a.cause; }).join(" · "), true);
+        }
+      }
+      renderAll();
+    }, function(e){ toast("Lecture arrêts : " + e.message, true); });
+  }
+
+  // ---------- Vues ----------
+  var menuOpen = false;
+  qs("#appTitle").addEventListener("dblclick", function(){
+    if (EMBED_OPTS && EMBED_OPTS.lock) return;
+    menuOpen = !menuOpen; qs("#tabs").hidden = !menuOpen;
+  });
+  function show(v){
+    if (v !== "setup"){ view = v; ls(K_VIEW, v); }
+    qs("#vSetup").hidden = v !== "setup";
+    qs("#vPoste").hidden = v !== "poste";
+    qs("#vSuivi").hidden = v !== "suivi";
+    qs("#vParams").hidden = v !== "params";
+    // Menu (Poste scan / Suivi / Paramètres) masqué : l'appareil reste sur sa page. Dans le fichier
+    // principal, double-cliquer sur le titre l'affiche pour changer de page ; jamais dans un fichier opérateur.
+    qs("#tabs").hidden = v === "setup" || !menuOpen;
+    document.querySelectorAll(".tab").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-view") === v); });
+    renderAll();
+    if (v === "poste") setTimeout(function(){ try { qs("#scanBox").focus({ preventScroll: true }); } catch(e){} }, 50);
+  }
+  qs("#tabs").addEventListener("click", function(e){ var b = e.target.closest(".tab"); if (b){ menuOpen = false; show(b.getAttribute("data-view")); } });
+  function renderAll(){ if (view === "poste") renderPoste(); if (view === "suivi") renderSuivi(); if (view === "params") renderParamsList(); }
+
+  // ---------- Poste scan ----------
+  function opts(list, v){ return '<option value="">— Choisir —</option>' + (list || []).map(function(x){ return '<option' + (x === v ? " selected" : "") + '>' + esc(x) + '</option>'; }).join(""); }
+  function openOf(m){ return state.arrets.filter(function(a){ return a.machine === m && a.statut === "En cours"; }).sort(function(a,b){ return a.debut < b.debut ? 1 : -1; })[0] || null; }
+  function msg(t, ok){ var el = qs("#pMsg"); el.textContent = t; el.className = "msg " + (ok ? "ok" : "err"); beep(ok); }
+  function renderPoste(){
+    var L = state.lists, set = !!poste.machine;
+    qs("#pTitle").textContent = set ? "Machine " + poste.machine : "Poste non configuré";
+    qs("#pSub").textContent = set ? [poste.ligne, poste.equipe ? "Équipe " + poste.equipe : ""].filter(Boolean).join(" · ") : "Choisissez la machine de cette tablette.";
+    var cfgOpen = !set || qs("#pCfg").getAttribute("data-force") === "1";
+    qs("#pCfg").hidden = !cfgOpen;
+    if (cfgOpen && document.activeElement && !/SELECT/.test(document.activeElement.tagName)){
+      qs("#pMachine").innerHTML = opts(L.machines, poste.machine);
+      qs("#pLigne").innerHTML = opts(L.lignes, poste.ligne);
+      qs("#pEquipe").innerHTML = opts(L.equipes, poste.equipe);
+    }
+    ["#pFin", "#pCauses"].forEach(function(s){ qs(s).hidden = !set; });
+    var open = set ? openOf(poste.machine) : null, st = qs("#pStatus");
+    st.className = "status " + (!set ? "" : open ? "stop" + (open.typeArret === "Planifié" ? " plan" : "") : "run");
+    st.innerHTML = !set ? '<div class="st">Poste non configuré</div>' :
+      open ? '<div class="st">ARRÊT EN COURS</div><div class="sc">' + esc(open.cause) + ' <span style="font-size:15px;font-weight:500">(' + esc(open.typeArret) + ')</span></div>' +
+             '<div class="se" data-debut="' + esc(open.debut) + '">' + elapsed(Date.now() - new Date(open.debut).getTime()) + '</div>' +
+             '<div class="sh">Depuis ' + hm(open.debut) + ' — scannez <b>FIN D\'ARRÊT</b> à la reprise.</div>'
+           : '<div class="st">EN PRODUCTION</div><div class="sh">En cas d\'arrêt, scannez le QR de la cause.</div>';
+    qs("#pFin").disabled = !open;
+    function btns(list, type){ return (list || []).map(function(c){ var act = open && open.cause === c && open.typeArret === type; return '<button class="cb ' + (type === "Planifié" ? "plan" : "np") + (act ? " active" : "") + '" data-t="' + esc(type) + '" data-c="' + esc(c) + '">' + esc(c) + '</button>'; }).join(""); }
+    qs("#pNP").innerHTML = btns(L.causesNonPlanifie, "Non planifié");
+    qs("#pP").innerHTML = btns(L.causesPlanifie, "Planifié");
+    var today = dISO(), rows = state.arrets.filter(function(a){ return a.machine === poste.machine && a.date === today; });
+    qs("#pToday").innerHTML = !set || !rows.length ? '<div class="empty">Aucun arrêt aujourd\'hui.</div>' :
+      '<table><thead><tr><th>Début</th><th>Fin</th><th>Durée</th><th>Cause</th></tr></thead><tbody>' + rows.map(function(a){
+        return '<tr><td>' + hm(a.debut) + '</td><td>' + (a.statut === "En cours" ? '<b class="err">en cours</b>' : hm(a.fin)) + '</td><td>' + (a.statut === "En cours" ? "—" : fmtNum(a.dureeMin, 1) + " min") + '</td><td>' + esc(a.cause) + '</td></tr>';
+      }).join("") + '</tbody></table>';
+  }
+  function savePoste(p){ poste = p; ls(K_POSTE, p); qs("#pCfg").removeAttribute("data-force"); renderPoste(); }
+  qs("#pCfgOk").addEventListener("click", function(){
+    var m = qs("#pMachine").value; if (!m){ toast("Choisissez la machine.", true); return; }
+    savePoste({ machine: m, ligne: qs("#pLigne").value, equipe: qs("#pEquipe").value });
+    qs("#scanBox").focus();
+  });
+  qs("#pChange").addEventListener("click", function(){ qs("#pCfg").setAttribute("data-force", "1"); qs("#pMachine").blur(); renderPoste(); });
+
+  function finish(a){
+    var fin = new Date(), d = Math.max(0.1, Math.round((fin - new Date(a.debut)) / 6000) / 10);
+    return db.collection("arrets").doc(a.id).update({ fin: fin.toISOString(), dureeMin: d, statut: "Terminé" }).then(function(){ return d; });
+  }
+  // Les écritures Firestore sont appliquées tout de suite en local (même hors ligne) : on n'attend
+  // pas la réponse du serveur pour confirmer à l'opérateur.
+  function startArret(type, cause){
+    if (!db){ msg("Pas de connexion à la base.", false); return; }
+    if (!poste.machine){ msg("Choisissez d'abord la machine (ou scannez le QR machine).", false); return; }
+    var open = openOf(poste.machine);
+    if (open && open.cause === cause && open.typeArret === type){
+      if (Date.now() - new Date(open.debut).getTime() < 5000) return;
+      finish(open).catch(function(e){ toast(e.message, true); });
+      msg("Fin d'arrêt « " + cause + " ».", true); return;
+    }
+    if (open) finish(open).catch(function(e){ toast(e.message, true); });
+    var now = new Date(), id = "arr_" + now.getTime().toString(36) + Math.random().toString(36).slice(2, 6);
+    db.collection("arrets").doc(id).set({
+      machine: poste.machine, ligne: poste.ligne || "", equipe: poste.equipe || "", date: dISO(now),
+      debut: now.toISOString(), fin: null, dureeMin: 0, typeArret: type, cause: cause, statut: "En cours",
+      source: "scan-firebase", createdAt: now.toISOString()
+    }).catch(function(e){ toast(e.message, true); });
+    msg((open ? "Arrêt précédent clôturé. " : "") + "Arrêt démarré : " + cause + ".", true);
+  }
+  function endArret(){
+    if (!poste.machine){ msg("Choisissez d'abord la machine.", false); return; }
+    var open = openOf(poste.machine);
+    if (!open){ msg("Aucun arrêt en cours — la machine est en production.", false); return; }
+    finish(open).then(function(d){ msg("Reprise production — « " + open.cause + " » : " + fmtNum(d, 1) + " min.", true); })
+      .catch(function(e){ toast(e.message, true); });
+    msg("Reprise production — « " + open.cause + " ».", true);
+  }
+  function decode(raw){
+    var s = String(raw || "").toUpperCase().replace(/[^A-Z]/g, ""), i = s.indexOf("PX");
+    if (i < 0) return null; s = s.slice(i);
+    if (s.indexOf(FIN) === 0) return { k: "fin" };
+    if (s.length < 7) return null;
+    var t = s.charAt(2), h = s.slice(3, 7), L = state.lists;
+    if (t === "K"){ var m = (L.machines || []).filter(function(x){ return hash4(x) === h; })[0]; return m ? { k: "machine", m: m } : { k: "?" }; }
+    if (t === "P" || t === "N"){
+      var type = t === "P" ? "Planifié" : "Non planifié", list = t === "P" ? L.causesPlanifie : L.causesNonPlanifie;
+      var c = (list || []).filter(function(x){ return hash4(x) === h; })[0];
+      return c ? { k: "cause", t: type, c: c } : { k: "?" };
+    }
+    return null;
+  }
+  function handle(raw){
+    var r = decode(raw);
+    if (!r){ msg("QR non reconnu.", false); return; }
+    if (r.k === "?"){ msg("QR d'une cause ou machine absente des Paramètres — réimprimez les QR.", false); return; }
+    if (r.k === "fin") return endArret();
+    if (r.k === "machine"){ savePoste({ machine: r.m, ligne: poste.ligne || "", equipe: poste.equipe || "" }); msg("Poste réglé sur " + r.m + ".", true); return; }
+    startArret(r.t, r.c);
+  }
+  (function(){
+    var box = qs("#scanBox"), t = null;
+    // Si le champ invisible n'a pas le focus (après un toucher sur l'écran), les touches tapées par la
+    // douchette sont quand même captées ici et renvoyées vers lui.
+    document.addEventListener("keydown", function(e){
+      if (view !== "poste" || e.target === box) return;
+      if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      if (e.key === "Enter" || e.key === "Tab"){ if (box.value){ e.preventDefault(); go(); } return; }
+      if (e.key && e.key.length === 1){ e.preventDefault(); box.value += e.key; clearTimeout(t); t = setTimeout(go, 300); try { box.focus({ preventScroll: true }); } catch(er){} }
+    });
+    function go(){ clearTimeout(t); var v = box.value; box.value = ""; if (v.replace(/[^A-Za-z]/g, "").length >= 5) handle(v); }
+    box.addEventListener("keydown", function(e){ if (e.key === "Enter" || e.key === "Tab"){ e.preventDefault(); go(); } });
+    box.addEventListener("input", function(){ clearTimeout(t); t = setTimeout(go, 300); });
+    setInterval(function(){
+      if (view !== "poste") return;
+      var a = document.activeElement;
+      if (!a || a === document.body || (a.tagName === "BUTTON")) { try { box.focus({ preventScroll: true }); } catch(e){} }
+    }, 1000);
+  })();
+  qs("#pCauses").addEventListener("click", function(e){ var b = e.target.closest(".cb"); if (b) startArret(b.getAttribute("data-t"), b.getAttribute("data-c")); });
+  qs("#pFin").addEventListener("click", endArret);
+
+  // ---------- Suivi ----------
+  function renderSuivi(){
+    var dIn = qs("#sDate"), today = dISO(); if (!dIn.value) dIn.value = today;
+    var day = dIn.value, isToday = day === today, per = qs("#sPer").value;
+    var from = per === "semaine" ? dISO(new Date(new Date(day + "T12:00:00").getTime() - 6*86400000)) : per === "mois" ? day.slice(0, 7) + "-01" : day;
+    var perLbl = per === "jour" ? (isToday ? "aujourd'hui" : "du " + fmtDate(day)) : per === "semaine" ? "du " + fmtDate(from) + " au " + fmtDate(day) : "du mois " + day.slice(5, 7) + "/" + day.slice(0, 4);
+    document.querySelectorAll(".per-lbl").forEach(function(el){ el.textContent = "Durée cumulée des arrêts " + perLbl; });
+    qs("#sNote").textContent = state.ready ? (isToday ? "Mise à jour en direct" : "") : "Chargement…";
+    var rows = state.arrets.filter(function(a){ return a.date >= from && a.date <= day; });
+    var open = state.arrets.filter(function(a){ return a.statut === "En cours"; }).sort(function(a,b){ return a.debut < b.debut ? -1 : 1; });
+    function dur(a){ return a.statut === "En cours" ? (Date.now() - new Date(a.debut).getTime()) / 60000 : (Number(a.dureeMin) || 0); }
+    var tot = 0, np = 0; rows.forEach(function(a){ var d = dur(a); tot += d; if (a.typeArret !== "Planifié") np += d; });
+    qs("#sKpis").innerHTML =
+      '<div class="kpi' + (open.length ? " alert" : "") + '"><div class="v">' + open.length + '</div><div class="l">À l\'arrêt</div></div>' +
+      '<div class="kpi"><div class="v">' + rows.length + '</div><div class="l">Arrêts ' + perLbl + '</div></div>' +
+      '<div class="kpi"><div class="v">' + fmtNum(np) + '</div><div class="l">Min non planifiées</div></div>' +
+      '<div class="kpi"><div class="v">' + fmtNum(tot - np) + '</div><div class="l">Min planifiées</div></div>';
+    qs("#sOpen").innerHTML = !open.length ? '<div class="empty">Aucune machine à l\'arrêt — tout tourne.</div>' : open.map(function(a){
+      var nw = newIds[a.id] && Date.now() - newIds[a.id] < 30000, pl = a.typeArret === "Planifié";
+      return '<div class="oc' + (pl ? " plan" : "") + (nw ? " new" : "") + '"><div class="m">' + esc(a.machine) + '</div><div class="c">' + esc(a.cause) +
+        ' <span class="tag ' + (pl ? "plan" : "np") + '">' + (pl ? "Planifié" : "Non planifié") + '</span></div>' +
+        '<div class="t" data-debut="' + esc(a.debut) + '">' + elapsed(Date.now() - new Date(a.debut).getTime()) + '</div>' +
+        '<div class="s">Depuis ' + hm(a.debut) + (a.equipe ? " · Équipe " + esc(a.equipe) : "") + (a.ligne ? " · " + esc(a.ligne) : "") + '</div></div>';
+    }).join("");
+    function bars(map){
+      var l = Object.keys(map).map(function(k){ return map[k]; }).sort(function(a,b){ return b.d - a.d; });
+      if (!l.length) return '<div class="empty">Aucun arrêt.</div>';
+      var max = l[0].d || 1;
+      return l.slice(0, 12).map(function(x){
+        return '<div class="r"><div style="flex:1;min-width:0"><div class="a">' + esc(x.k) + (x.open ? ' <span class="tag np">À l\'arrêt</span>' : "") + '</div><div class="b">' + x.n + ' arrêt(s)</div>' +
+          '<div class="bar' + (x.plan ? " plan" : "") + '" style="width:' + Math.max(4, Math.round(x.d / max * 100)) + '%"></div></div><div class="d">' + fmtNum(x.d) + ' min</div></div>';
+      }).join("");
+    }
+    var bm = {}, bc = {}, bl = {}, be = {};
+    function acc(map, k, a, d){ var x = map[k] || (map[k] = { k: k, d: 0, n: 0 }); x.d += d; x.n++; if (a.statut === "En cours") x.open = true; }
+    rows.forEach(function(a){
+      var d = dur(a), m = bm[a.machine] || (bm[a.machine] = { k: a.machine, d: 0, n: 0 });
+      m.d += d; m.n++; if (a.statut === "En cours") m.open = true;
+      acc(bl, a.ligne || "Ligne non renseignée", a, d); acc(be, a.equipe || "Équipe non renseignée", a, d);
+      var key = a.cause + "|" + a.typeArret, c = bc[key] || (bc[key] = { k: a.cause, d: 0, n: 0, plan: a.typeArret === "Planifié" });
+      c.d += d; c.n++;
+    });
+    qs("#sMach").innerHTML = bars(bm); qs("#sCause").innerHTML = bars(bc);
+    qs("#sLigne").innerHTML = bars(bl); qs("#sEquipe").innerHTML = bars(be);
+    var sorted = rows.slice().sort(function(a,b){ return a.debut < b.debut ? 1 : -1; });
+    qs("#sJournal").innerHTML = !sorted.length ? '<div class="empty">Aucun arrêt.</div>' : sorted.slice(0, 200).map(function(a){
+      var pl = a.typeArret === "Planifié";
+      return '<div class="r"><div style="min-width:0"><div class="a">' + esc(a.machine) + ' · ' + esc(a.cause) + ' <span class="tag ' + (pl ? "plan" : "np") + '">' + (pl ? "P" : "NP") + '</span></div>' +
+        '<div class="b">' + hm(a.debut) + ' → ' + (a.statut === "En cours" ? "en cours" : hm(a.fin)) + (a.equipe ? " · " + esc(a.equipe) : "") + '</div></div>' +
+        '<div class="d">' + (a.statut === "En cours" ? '<span class="err">en cours</span>' : fmtNum(a.dureeMin, 1) + " min") + '</div></div>';
+    }).join("");
+  }
+  qs("#sDate").addEventListener("change", renderSuivi);
+  qs("#sPer").addEventListener("change", renderSuivi);
+  setInterval(function(){
+    document.querySelectorAll("[data-debut]").forEach(function(el){ el.textContent = elapsed(Date.now() - new Date(el.getAttribute("data-debut")).getTime()); });
+  }, 1000);
+  setInterval(function(){ if (view === "suivi") renderSuivi(); }, 60000);
+
+  // ---------- Paramètres ----------
+  var LMAP = { lNP: "causesNonPlanifie", lP: "causesPlanifie", lM: "machines", lL: "lignes", lE: "equipes" };
+  function fillOpSelects(){
+    var L = state.lists;
+    [["#opMachine", L.machines], ["#opLigne", L.lignes], ["#opEquipe", L.equipes]].forEach(function(x){
+      var el = qs(x[0]), v = el.value;
+      el.innerHTML = '<option value="">— Choisie sur la tablette —</option>' + (x[1] || []).map(function(o){ return '<option' + (o === v ? " selected" : "") + '>' + esc(o) + '</option>'; }).join("");
+    });
+  }
+  qs("#opGo").addEventListener("click", function(){
+    var cfg = EMBED_CONFIG || ls(K_CFG);
+    if (!cfg){ toast("Connectez d'abord cet appareil à Firebase.", true); return; }
+    var m = qs("#opMachine").value;
+    var opts = { view: qs("#opView").value, lock: qs("#opLock").checked,
+      poste: m ? { machine: m, ligne: qs("#opLigne").value, equipe: qs("#opEquipe").value } : null };
+    var out = PRISTINE
+      .replace(/var EMBED_CONFIG = \/\*__FIREBASE_CONFIG__\*\/[^;]*;/, function(){ return "var EMBED_CONFIG = /*__FIREBASE_CONFIG__*/" + JSON.stringify(cfg) + ";"; })
+      .replace(/var EMBED_OPTS = \/\*__OPTS__\*\/[^;]*;/, function(){ return "var EMBED_OPTS = /*__OPTS__*/" + JSON.stringify(opts) + ";"; });
+    if (out.indexOf(JSON.stringify(cfg)) === -1){ toast("Création impossible.", true); return; }
+    var name = "Arrets_Atelier_" + (m ? m.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "") : opts.view === "suivi" ? "Suivi" : "Operateur") + ".html";
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([out], { type: "text/html" })); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    toast("Fichier « " + name + " » créé : envoyez-le à l'opérateur.");
+  });
+  function fillParams(){
+    fillOpSelects();
+    Object.keys(LMAP).forEach(function(id){ var el = qs("#" + id); if (document.activeElement !== el) el.value = (state.lists[LMAP[id]] || []).join("\n"); });
+  }
+  qs("#lSave").addEventListener("click", function(){
+    if (!db){ toast("Pas de connexion.", true); return; }
+    var out = {};
+    Object.keys(LMAP).forEach(function(id){
+      var seen = {}; out[LMAP[id]] = qs("#" + id).value.split("\n").map(function(x){ return x.trim(); }).filter(function(x){ if (!x || seen[x]) return false; seen[x] = 1; return true; });
+    });
+    db.doc("config/arrets").set(out, { merge: true }).then(function(){ toast("Listes enregistrées. Pensez à réimprimer les QR."); }).catch(function(e){ toast(e.message, true); });
+  });
+  function renderParamsList(){
+    var since = dISO(new Date(Date.now() - 7*86400000));
+    var rows = state.arrets.filter(function(a){ return a.date >= since; });
+    qs("#aAll").innerHTML = !rows.length ? '<div class="empty">Aucun arrêt.</div>' :
+      '<table><thead><tr><th>Date</th><th>Machine</th><th>Début</th><th>Fin</th><th>Durée</th><th>Cause</th><th></th></tr></thead><tbody>' + rows.slice(0, 300).map(function(a){
+        return '<tr><td>' + fmtDate(a.date) + '</td><td>' + esc(a.machine) + '</td><td>' + hm(a.debut) + '</td><td>' + (a.statut === "En cours" ? "en cours" : hm(a.fin)) + '</td><td>' +
+          (a.statut === "En cours" ? "—" : fmtNum(a.dureeMin, 1)) + '</td><td>' + esc(a.cause) + '</td><td><button class="btn" data-del="' + esc(a.id) + '">Suppr.</button></td></tr>';
+      }).join("") + '</tbody></table>';
+    var f = qs("#eFrom"), t = qs("#eTo");
+    if (!t.value) t.value = dISO(); if (!f.value) f.value = dISO(new Date(Date.now() - 6*86400000));
+  }
+  qs("#aAll").addEventListener("click", function(e){
+    var b = e.target.closest("[data-del]"); if (!b) return;
+    if (!confirm("Supprimer cet arrêt ?")) return;
+    db.collection("arrets").doc(b.getAttribute("data-del")).delete().catch(function(er){ toast(er.message, true); });
+  });
+  qs("#eGo").addEventListener("click", function(){
+    var f = qs("#eFrom").value, t = qs("#eTo").value;
+    var rows = state.arrets.filter(function(a){ return a.statut === "Terminé" && (!f || a.date >= f) && (!t || a.date <= t); });
+    if (!rows.length){ toast("Aucun arrêt terminé sur cette période.", true); return; }
+    var data = { type: "pilotage-atelier-arrets", version: 1, exportedAt: new Date().toISOString(), arrets: rows };
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" }));
+    a.download = "arrets_" + (f || "debut") + "_au_" + (t || "fin") + ".json";
+    document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    toast(rows.length + " arrêt(s) exportés.");
+  });
+  qs("#fbReset").addEventListener("click", function(){
+    if (!confirm("Oublier la base Firebase de cet appareil ?")) return;
+    ls(K_CFG, null); location.reload();
+  });
+  qs("#cfgSave").addEventListener("click", function(){
+    var cfg = parseFirebaseConfig(qs("#cfgText").value);
+    if (!cfg){ qs("#cfgErr").textContent = "Bloc non reconnu : il faut au moins apiKey (AIza…), authDomain (…firebaseapp.com) et appId (1:…:web:…)."; return; }
+    ls(K_CFG, cfg); location.reload();
+  });
+
+  // ---------- QR à imprimer ----------
+  function qrSvg(text){
+    var q = PA_QR(text), n = q.getModuleCount(), z = 2, s = n + 2*z, p = "";
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c)) p += "M" + (c + z) + " " + (r + z) + "h1v1h-1z";
+    return '<svg viewBox="0 0 ' + s + " " + s + '" shape-rendering="crispEdges"><rect width="' + s + '" height="' + s + '" fill="#fff"/><path d="' + p + '" fill="#000"/></svg>';
+  }
+  function printCards(title, sub, cards){
+    var pages = [], per = 12;
+    for (var i = 0; i < cards.length; i += per) pages.push(cards.slice(i, i + per));
+    qs("#printArea").innerHTML = pages.map(function(pc){
+      return '<div class="qp"><div class="qh">' + esc(title) + '</div><div class="qs">' + esc(sub) + '</div><div class="qg">' + pc.map(function(c){
+        return '<div class="qc" style="border-color:' + c.col + '"><div class="qt" style="background:' + c.col + '">' + esc(c.tag) + '</div>' + qrSvg(c.code) + '<div class="ql">' + esc(c.label) + '</div></div>';
+      }).join("") + '</div></div>';
+    }).join("");
+    setTimeout(function(){ window.print(); }, 100);
+  }
+  qs("#qCauses").addEventListener("click", function(){
+    var L = state.lists;
+    printCards("Arrêts machine — scannez la cause", "Début d'arrêt : scannez la cause. Reprise : scannez FIN D'ARRÊT. Valable pour toutes les machines.",
+      [{ tag: "REPRISE PRODUCTION", label: "FIN D'ARRÊT", code: FIN, col: "#168c5a" }]
+        .concat((L.causesNonPlanifie || []).map(function(c){ return { tag: "ARRÊT NON PLANIFIÉ", label: c, code: codeCause("Non planifié", c), col: "#c82828" }; }))
+        .concat((L.causesPlanifie || []).map(function(c){ return { tag: "ARRÊT PLANIFIÉ", label: c, code: codeCause("Planifié", c), col: "#d68c14" }; })));
+  });
+  qs("#qMachines").addEventListener("click", function(){
+    printCards("QR machines — réglage des tablettes", "Collez le QR sur la machine : en le scannant, la tablette est réglée sur cette machine.",
+      (state.lists.machines || []).map(function(m){ return { tag: "CONFIGURER LE POSTE", label: "Machine " + m, code: codeMachine(m), col: "#143c82" }; }));
+  });
+
+  window.__arretsTest = { hash4: hash4, parse: parseFirebaseConfig, decode: decode };
+  connect();
+})();
+</script>
+</body>
+</html>
