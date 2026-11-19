@@ -132,7 +132,6 @@
   <section id="vPoste" hidden>
     <div class="top" style="margin-bottom:8px">
       <div><div class="machine" id="pTitle">Poste non configuré</div><div class="hint" id="pSub"></div></div>
-      <button class="btn" id="pChange">Changer de machine</button>
     </div>
     <div class="card" id="pCfg" hidden>
       <h2>Machine de cette tablette</h2>
@@ -1683,7 +1682,6 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
     savePoste({ machine: m, ligne: qs("#pLigne").value });
     qs("#scanBox").focus();
   });
-  qs("#pChange").addEventListener("click", function(){ qs("#pCfg").setAttribute("data-force", "1"); qs("#pMachine").blur(); renderPoste(); });
 
   // ---------- Production du poste (pour le TRS) ----------
   function prodId(machine, date, equipe){ return date + "_" + codeMachine(machine) + "_" + hash4(equipe || "-"); }
