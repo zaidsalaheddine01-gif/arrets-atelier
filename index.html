@@ -170,11 +170,11 @@
     </div>
     <div class="card" id="pProd">
       <h2>Saisie production du poste</h2>
-      <div class="sub">Opérateur, OF et phase + quantités : tout est enregistré ensemble (traçabilité). La quantité défectueuse se calcule seule ; le temps d'ouverture vient du pointage ci-dessus.</div>
-      <div class="field"><label>Nom d'opérateur</label><input id="pOperName" type="text" autocomplete="off" autocapitalize="words" placeholder="ex. Ahmed Bennani"></div>
+      <div class="sub">Opérateur, OF et phase (<b>obligatoires</b>) + quantités : l'enregistrement part directement dans la <b>Saisie Production</b> de Pilotage Atelier. La quantité défectueuse se calcule seule ; le temps d'ouverture vient du pointage.</div>
+      <div class="field"><label>Nom d'opérateur <span style="color:#e06">*</span></label><input id="pOperName" type="text" autocomplete="off" autocapitalize="words" placeholder="ex. Ahmed Bennani" required></div>
       <div class="row" style="margin-top:8px">
-        <div class="field"><label>OF en cours</label><input id="pOf" type="text" autocomplete="off" inputmode="text" placeholder="ex. OF-12345"></div>
-        <div class="field"><label>OP / Phase en cours</label><input id="pPhase" type="text" autocomplete="off" inputmode="text" placeholder="ex. 30"></div>
+        <div class="field"><label>OF en cours <span style="color:#e06">*</span></label><input id="pOf" type="text" autocomplete="off" inputmode="text" placeholder="ex. OF-12345" required></div>
+        <div class="field"><label>OP / Phase en cours <span style="color:#e06">*</span></label><input id="pPhase" type="text" autocomplete="off" inputmode="text" placeholder="ex. 30" required></div>
       </div>
       <div class="row" style="margin-top:10px">
         <div class="field"><label>Qté totale</label><input type="number" id="prTot" min="0" step="1" inputmode="numeric" placeholder="ex. 320"></div>
@@ -1722,14 +1722,25 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
   qs("#prSave").addEventListener("click", function(){
     if (!db){ toast("Pas de connexion à la base.", true); return; }
     if (!poste.machine){ toast("Choisissez d'abord la machine.", true); return; }
+    if (!operNow()){ toast("Nom d'opérateur obligatoire.", true); qs("#pOperName").focus(); return; }
+    if (!ofNow()){ toast("OF en cours obligatoire.", true); qs("#pOf").focus(); return; }
+    if (!phaseNow()){ toast("OP / Phase en cours obligatoire.", true); qs("#pPhase").focus(); return; }
     var tot = Number(qs("#prTot").value) || 0, conf = Number(qs("#prConf").value) || 0;
     if (conf > tot){ toast("La quantité conforme dépasse la quantité totale.", true); return; }
     var eq = equipeAt(), date = dISO(), id = prodId(poste.machine, date, eq), sb = shiftBounds();
+    var tOuv = Math.round(ouvWindow(poste.machine, sb.start, sb.end).running / 60000);
+    var ph = phaseNow(), opNum = ph !== "" && !isNaN(Number(ph)) ? Number(ph) : null;
+    var ex = prodFind(poste.machine, date, eq);
     db.collection("production").doc(id).set({
-      machine: poste.machine, ligne: poste.ligne || "", equipe: eq, operateur: operNow(), of: ofNow(), phase: phaseNow(), date: date,
-      tempsOuvertureMin: Math.round(ouvWindow(poste.machine, sb.start, sb.end).running / 60000), qteTotale: tot, qteConforme: conf, qteDefectueuse: Math.max(0, tot - conf),
-      source: "arrets-atelier", updatedAt: new Date().toISOString()
-    }, { merge: true }).then(function(){ toast("Production enregistrée : " + poste.machine + " (" + fmtDate(date) + ")."); }).catch(function(e){ toast(e.message, true); });
+      // champs lus directement par « Saisie Production » du desktop (même projet Firebase)
+      date: date, ofNumber: ofNow(), piece: (ex && ex.piece) || "", op: opNum, opLabel: ph ? "Op " + ph : "",
+      ligne: poste.ligne || "", machine: poste.machine, equipe: eq, saisiPar: operNow(),
+      tempsOuverture: tOuv, cadenceStd: (ex && ex.cadenceStd) || 0, typePiece: (ex && ex.typePiece) || "",
+      qteTotale: tot, qteConforme: conf, qteDefectueuse: Math.max(0, tot - conf),
+      // champs natifs Arrêts Atelier (traçabilité / Suivi)
+      operateur: operNow(), of: ofNow(), phase: ph, tempsOuvertureMin: tOuv,
+      source: "arrets-atelier", createdAt: (ex && ex.createdAt) || new Date().toISOString(), updatedAt: new Date().toISOString()
+    }, { merge: true }).then(function(){ toast("Production enregistrée : " + poste.machine + " (" + fmtDate(date) + ") → Saisie Production."); }).catch(function(e){ toast(e.message, true); });
   });
 
   // ---------- Pointage : temps d'ouverture = temps pointé − arrêts (se met en pause pendant les arrêts) ----------
