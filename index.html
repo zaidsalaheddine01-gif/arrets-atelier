@@ -147,6 +147,10 @@
     <!-- Champ de réception de la douchette : invisible, il garde le focus pour recevoir les scans. -->
     <input id="scanBox" class="scanbox scan-hidden" aria-label="Réception douchette" tabindex="-1" inputmode="none" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Scannez le QR ici…">
     <div class="msg" id="pMsg">Prêt à scanner.</div>
+    <div class="card" id="pOper">
+      <div class="field"><label>Nom d'opérateur</label><input id="pOperName" type="text" autocomplete="off" autocapitalize="words" placeholder="ex. Ahmed Bennani"></div>
+      <div class="hint" style="margin-top:4px">Enregistré avec les arrêts, le pointage et la production (traçabilité).</div>
+    </div>
     <div class="card" id="pPointage">
       <div class="row" style="align-items:center;justify-content:space-between">
         <div>
@@ -199,6 +203,7 @@
       <div class="card"><h2>Top causes</h2><div class="sub per-lbl"></div><div id="sCause"></div></div>
       <div class="card"><h2>Par ligne</h2><div class="sub per-lbl"></div><div id="sLigne"></div></div>
       <div class="card"><h2>Par équipe</h2><div class="sub per-lbl"></div><div id="sEquipe"></div></div>
+      <div class="card"><h2>Par opérateur</h2><div class="sub per-lbl"></div><div id="sOper"></div></div>
     </div>
     <div class="card"><h2>Journal des arrêts</h2><div id="sJournal"></div></div>
   </section>
@@ -1650,15 +1655,15 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
   function renderPoste(){
     var L = state.lists, set = !!poste.machine;
     qs("#pTitle").textContent = set ? "Machine " + poste.machine : "Poste non configuré";
-    qs("#pSub").textContent = set ? [poste.ligne, "Équipe " + equipeAt() + " (auto)"].filter(Boolean).join(" · ") : "Choisissez la machine de cette tablette.";
+    qs("#pSub").textContent = set ? [poste.ligne, "Équipe " + equipeAt() + " (auto)", poste.operateur ? "Op. " + poste.operateur : ""].filter(Boolean).join(" · ") : "Choisissez la machine de cette tablette.";
     var cfgOpen = !set || qs("#pCfg").getAttribute("data-force") === "1";
     qs("#pCfg").hidden = !cfgOpen;
     if (cfgOpen && document.activeElement && !/SELECT/.test(document.activeElement.tagName)){
       qs("#pMachine").innerHTML = opts(L.machines, poste.machine);
       qs("#pLigne").innerHTML = opts(L.lignes, poste.ligne);
     }
-    ["#pFin", "#pCauses", "#pProd", "#pPointage"].forEach(function(s){ qs(s).hidden = !set; });
-    if (set){ renderProd(); renderPointage(); }
+    ["#pFin", "#pCauses", "#pProd", "#pPointage", "#pOper"].forEach(function(s){ qs(s).hidden = !set; });
+    if (set){ var opEl = qs("#pOperName"); if (opEl && document.activeElement !== opEl) opEl.value = poste.operateur || ""; renderProd(); renderPointage(); }
     var open = set ? openOf(poste.machine) : null, st = qs("#pStatus");
     st.className = "status " + (!set ? "" : open ? "stop" + (open.typeArret === "Planifié" ? " plan" : "") : "run");
     st.innerHTML = !set ? '<div class="st">Poste non configuré</div>' :
@@ -1676,11 +1681,16 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
         return '<tr><td>' + hm(a.debut) + '</td><td>' + (a.statut === "En cours" ? '<b class="err">en cours</b>' : hm(a.fin)) + '</td><td>' + (a.statut === "En cours" ? "—" : fmtNum(a.dureeMin, 1) + " min") + '</td><td>' + esc(a.cause) + '</td></tr>';
       }).join("") + '</tbody></table>';
   }
-  function savePoste(p){ poste = p; ls(K_POSTE, p); qs("#pCfg").removeAttribute("data-force"); renderPoste(); }
+  function savePoste(p){ if (p && p.operateur == null && poste && poste.operateur) p.operateur = poste.operateur; poste = p; ls(K_POSTE, p); qs("#pCfg").removeAttribute("data-force"); renderPoste(); }
+  function operNow(){ return (poste.operateur || "").trim(); }
   qs("#pCfgOk").addEventListener("click", function(){
     var m = qs("#pMachine").value; if (!m){ toast("Choisissez la machine.", true); return; }
     savePoste({ machine: m, ligne: qs("#pLigne").value });
     qs("#scanBox").focus();
+  });
+  qs("#pOperName").addEventListener("input", function(){
+    poste.operateur = this.value; ls(K_POSTE, poste);
+    if (poste.machine) qs("#pSub").textContent = [poste.ligne, "Équipe " + equipeAt() + " (auto)", operNow() ? "Op. " + operNow() : ""].filter(Boolean).join(" · ");
   });
 
   // ---------- Production du poste (pour le TRS) ----------
@@ -1708,7 +1718,7 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
     if (conf > tot){ toast("La quantité conforme dépasse la quantité totale.", true); return; }
     var eq = equipeAt(), date = dISO(), id = prodId(poste.machine, date, eq), sb = shiftBounds();
     db.collection("production").doc(id).set({
-      machine: poste.machine, ligne: poste.ligne || "", equipe: eq, date: date,
+      machine: poste.machine, ligne: poste.ligne || "", equipe: eq, operateur: operNow(), date: date,
       tempsOuvertureMin: Math.round(ouvWindow(poste.machine, sb.start, sb.end).running / 60000), qteTotale: tot, qteConforme: conf, qteDefectueuse: Math.max(0, tot - conf),
       source: "arrets-atelier", updatedAt: new Date().toISOString()
     }, { merge: true }).then(function(){ toast("Production enregistrée : " + poste.machine + " (" + fmtDate(date) + ")."); }).catch(function(e){ toast(e.message, true); });
@@ -1753,7 +1763,7 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
     if (op){ db.collection("pointages").doc(op.id).update({ fin: new Date().toISOString(), statut: "Fermé" }).catch(function(e){ toast(e.message, true); }); msg("Poste fermé — temps d'ouverture arrêté.", true); }
     else {
       var now = new Date(), id = "pt_" + now.getTime().toString(36) + Math.random().toString(36).slice(2, 5);
-      db.collection("pointages").doc(id).set({ machine: poste.machine, ligne: poste.ligne || "", equipe: equipeAt(now), date: dISO(now), debut: now.toISOString(), fin: null, statut: "Ouvert", source: "arrets-atelier", createdAt: now.toISOString() }).catch(function(e){ toast(e.message, true); });
+      db.collection("pointages").doc(id).set({ machine: poste.machine, ligne: poste.ligne || "", equipe: equipeAt(now), operateur: operNow(), date: dISO(now), debut: now.toISOString(), fin: null, statut: "Ouvert", source: "arrets-atelier", createdAt: now.toISOString() }).catch(function(e){ toast(e.message, true); });
       msg("Poste ouvert — temps d'ouverture démarré.", true);
     }
   }
@@ -1778,7 +1788,7 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
     if (open) finish(open).catch(function(e){ toast(e.message, true); });
     var now = new Date(), id = "arr_" + now.getTime().toString(36) + Math.random().toString(36).slice(2, 6);
     db.collection("arrets").doc(id).set({
-      machine: poste.machine, ligne: poste.ligne || "", equipe: equipeAt(now), date: dISO(now),
+      machine: poste.machine, ligne: poste.ligne || "", equipe: equipeAt(now), operateur: operNow(), date: dISO(now),
       debut: now.toISOString(), fin: null, dureeMin: 0, typeArret: type, cause: cause, statut: "En cours",
       source: "scan-firebase", createdAt: now.toISOString()
     }).catch(function(e){ toast(e.message, true); });
@@ -1879,7 +1889,7 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
       return '<div class="oc' + (pl ? " plan" : "") + (nw ? " new" : "") + '"><div class="m">' + esc(a.machine) + '</div><div class="c">' + esc(a.cause) +
         ' <span class="tag ' + (pl ? "plan" : "np") + '">' + (pl ? "Planifié" : "Non planifié") + '</span></div>' +
         '<div class="t" data-debut="' + esc(a.debut) + '">' + elapsed(Date.now() - new Date(a.debut).getTime()) + '</div>' +
-        '<div class="s">Depuis ' + hm(a.debut) + (a.equipe ? " · Équipe " + esc(a.equipe) : "") + (a.ligne ? " · " + esc(a.ligne) : "") + '</div></div>';
+        '<div class="s">Depuis ' + hm(a.debut) + (a.equipe ? " · Équipe " + esc(a.equipe) : "") + (a.ligne ? " · " + esc(a.ligne) : "") + (a.operateur ? " · Op. " + esc(a.operateur) : "") + '</div></div>';
     }).join("");
     function bars(map){
       var l = Object.keys(map).map(function(k){ return map[k]; }).sort(function(a,b){ return b.d - a.d; });
@@ -1890,22 +1900,24 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
           '<div class="bar' + (x.plan ? " plan" : "") + '" style="width:' + Math.max(4, Math.round(x.d / max * 100)) + '%"></div></div><div class="d">' + fmtNum(x.d) + ' min</div></div>';
       }).join("");
     }
-    var bm = {}, bc = {}, bl = {}, be = {};
+    var bm = {}, bc = {}, bl = {}, be = {}, bo = {};
     function acc(map, k, a, d){ var x = map[k] || (map[k] = { k: k, d: 0, n: 0 }); x.d += d; x.n++; if (a.statut === "En cours") x.open = true; }
     rows.forEach(function(a){
       var d = dur(a), m = bm[a.machine] || (bm[a.machine] = { k: a.machine, d: 0, n: 0 });
       m.d += d; m.n++; if (a.statut === "En cours") m.open = true;
       acc(bl, a.ligne || "Ligne non renseignée", a, d); acc(be, a.equipe || "Équipe non renseignée", a, d);
+      acc(bo, a.operateur || "Opérateur non renseigné", a, d);
       var key = a.cause + "|" + a.typeArret, c = bc[key] || (bc[key] = { k: a.cause, d: 0, n: 0, plan: a.typeArret === "Planifié" });
       c.d += d; c.n++;
     });
     qs("#sMach").innerHTML = bars(bm); qs("#sCause").innerHTML = bars(bc);
     qs("#sLigne").innerHTML = bars(bl); qs("#sEquipe").innerHTML = bars(be);
+    qs("#sOper").innerHTML = bars(bo);
     var sorted = rows.slice().sort(function(a,b){ return a.debut < b.debut ? 1 : -1; });
     qs("#sJournal").innerHTML = !sorted.length ? '<div class="empty">Aucun arrêt.</div>' : sorted.slice(0, 200).map(function(a){
       var pl = a.typeArret === "Planifié";
       return '<div class="r"><div style="min-width:0"><div class="a">' + esc(a.machine) + ' · ' + esc(a.cause) + ' <span class="tag ' + (pl ? "plan" : "np") + '">' + (pl ? "P" : "NP") + '</span></div>' +
-        '<div class="b">' + hm(a.debut) + ' → ' + (a.statut === "En cours" ? "en cours" : hm(a.fin)) + (a.equipe ? " · " + esc(a.equipe) : "") + '</div></div>' +
+        '<div class="b">' + hm(a.debut) + ' → ' + (a.statut === "En cours" ? "en cours" : hm(a.fin)) + (a.equipe ? " · " + esc(a.equipe) : "") + (a.operateur ? " · " + esc(a.operateur) : "") + '</div></div>' +
         '<div class="d">' + (a.statut === "En cours" ? '<span class="err">en cours</span>' : fmtNum(a.dureeMin, 1) + " min") + '</div></div>';
     }).join("");
   }
