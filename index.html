@@ -139,8 +139,8 @@
       <div class="row">
         <div class="field"><label>Machine</label><select id="pMachine"></select></div>
         <div class="field"><label>Ligne</label><select id="pLigne"></select></div>
-        <div class="field"><label>Équipe</label><select id="pEquipe"></select></div>
       </div>
+      <div class="hint" style="margin-top:6px">L'équipe est détectée automatiquement selon l'heure : Matin 6h–14h · Après-midi 14h–22h · Nuit 22h–6h.</div>
       <div class="row" style="margin-top:10px"><button class="btn primary" id="pCfgOk">Valider</button></div>
       <div class="hint" style="margin-top:8px">Ou scannez le QR de la machine.</div>
     </div>
@@ -148,12 +148,39 @@
     <!-- Champ de réception de la douchette : invisible, il garde le focus pour recevoir les scans. -->
     <input id="scanBox" class="scanbox scan-hidden" aria-label="Réception douchette" tabindex="-1" inputmode="none" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Scannez le QR ici…">
     <div class="msg" id="pMsg">Prêt à scanner.</div>
+    <div class="card" id="pPointage">
+      <div class="row" style="align-items:center;justify-content:space-between">
+        <div>
+          <h2 style="margin:0">Temps d'ouverture</h2>
+          <div class="hint" id="ptSub">Poste fermé.</div>
+        </div>
+        <div style="text-align:right">
+          <div class="se" id="ouvClock" style="margin:0;font-size:40px">0:00</div>
+          <div class="hint" id="ptState"></div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px"><button class="btn primary" id="ptToggle" style="flex:1">Ouvrir le poste (démarrer le temps d'ouverture)</button></div>
+      <div class="hint" style="margin-top:6px">Le temps d'ouverture se met en pause pendant les arrêts et repart tout seul à la reprise.</div>
+    </div>
     <button class="fin" id="pFin" disabled>FIN D'ARRÊT — reprise production</button>
     <div class="card" id="pCauses">
       <h2>Arrêts non planifiés</h2><div class="sub">Sans douchette, touchez la cause</div>
       <div class="grid" id="pNP"></div>
       <h2 style="margin-top:14px">Arrêts planifiés</h2>
       <div class="grid" id="pP"></div>
+    </div>
+    <div class="card" id="pProd">
+      <h2>Production du poste (fin de poste)</h2>
+      <div class="sub">La quantité défectueuse se calcule seule. Le temps d'ouverture est mesuré par le pointage ci-dessus.</div>
+      <div class="row">
+        <div class="field"><label>Qté totale</label><input type="number" id="prTot" min="0" step="1" inputmode="numeric" placeholder="ex. 320"></div>
+        <div class="field"><label>Qté conforme</label><input type="number" id="prConf" min="0" step="1" inputmode="numeric" placeholder="ex. 312"></div>
+        <div class="field"><label>Qté défectueuse (auto)</label><input type="number" id="prDef" readonly tabindex="-1" placeholder="—"></div>
+      </div>
+      <div class="row" style="margin-top:10px;align-items:center">
+        <span class="hint" id="prQual"></span>
+        <button class="btn primary" id="prSave">Enregistrer la production</button>
+      </div>
     </div>
     <div class="card"><h2>Arrêts du jour sur ce poste</h2><div id="pToday"></div></div>
   </section>
@@ -167,6 +194,7 @@
     </div>
     <div class="kpis" id="sKpis"></div>
     <div class="card"><h2>À l'arrêt maintenant</h2><div class="open" id="sOpen"></div></div>
+    <div class="card"><h2>Production &amp; TRS</h2><div class="sub" id="sProdSub"></div><div class="kpis" id="sProdKpis"></div></div>
     <div class="two">
       <div class="card"><h2>Par machine</h2><div class="sub per-lbl"></div><div id="sMach"></div></div>
       <div class="card"><h2>Top causes</h2><div class="sub per-lbl"></div><div id="sCause"></div></div>
@@ -185,7 +213,7 @@
         <div class="field"><label>Arrêts non planifiés</label><textarea id="lNP"></textarea></div>
         <div class="field"><label>Arrêts planifiés</label><textarea id="lP"></textarea></div>
         <div class="field"><label>Machines</label><textarea id="lM"></textarea></div>
-        <div class="field"><label>Lignes</label><textarea id="lL" style="min-height:80px"></textarea><label style="margin-top:8px">Équipes</label><textarea id="lE" style="min-height:80px"></textarea></div>
+        <div class="field"><label>Lignes</label><textarea id="lL" style="min-height:80px"></textarea><div class="hint" style="margin-top:8px">Les équipes sont automatiques selon l'heure (Matin 6h–14h · Après-midi 14h–22h · Nuit 22h–6h).</div></div>
       </div>
       <div class="row" style="margin-top:10px"><button class="btn primary" id="lSave">Enregistrer les listes</button></div>
     </div>
@@ -214,7 +242,6 @@
         <div class="field"><label>Page d'ouverture</label><select id="opView"><option value="poste">Poste scan (tablette)</option><option value="suivi">Suivi (téléphone)</option></select></div>
         <div class="field"><label>Machine (option)</label><select id="opMachine"></select></div>
         <div class="field"><label>Ligne (option)</label><select id="opLigne"></select></div>
-        <div class="field"><label>Équipe (option)</label><select id="opEquipe"></select></div>
       </div>
       <div class="row" style="margin-top:10px;align-items:center">
         <label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:13px;letter-spacing:0;color:var(--text-primary)"><input type="checkbox" id="opLock" checked> Masquer « Paramètres » pour l'opérateur</label>
@@ -1467,7 +1494,7 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
 })();
   var DEFAULTS = {"causesNonPlanifie": ["Panne mécanique", "Panne électrique", "Alarme CN / défaut commande", "Casse outil", "Usure outil (changement imprévu)", "Réglage/Changement outil", "Problème de bridage / montage", "Manque matière première", "Attente outil / porte-outil", "Attente programme CN", "Attente régleur", "Attente validation 1ère pièce", "Pièce non conforme / retouche", "Attente opérateur", "Manque air / énergie", "Liquide de coupe / copeaux", "Incident/Accident"], "causesPlanifie": ["Changement de série", "Montage / démontage outillage", "Pré-réglage outils", "Prise d'origine / palpage", "Contrôle 1ère pièce (FAI)", "Essai / mise au point programme", "Maintenance préventive", "Nettoyage machine / 5S", "Pause réglementaire", "Repas", "Réunion qualité", "Formation"], "machines": ["MORI SEIKI 3 axes SV-50 (FNV3-01)", "DOOSAN 4 axes DNM 6700 (FNV04-01)", "DOOSAN 3 axes DNM 5700 (FNV3-02)", "DOOSAN 4 axes NHP 5500 (FNH4-01)", "DOOSAN 3 axes PUMA GT 2600M (TCN3G)", "DOOSAN 3 axes PUMA DTN 2600M (TCN3D)", "DOOSAN 2 axes LYNX 2100 (TCN2)", "Tour conventionnelle (TCV)"], "lignes": ["Ligne Tournage", "Ligne Fraisage", "Qualité", "Magasin Produit fini", "Magasin Matière & Outillage"], "equipes": ["Matin", "Après-midi", "Nuit"]};
   var K_CFG = "arretsAtelier_firebase", K_POSTE = "arretsAtelier_poste", K_VIEW = "arretsAtelier_view";
-  var SAFE = "BCDEFGHIJKLNOPRSTUVXY", FIN = "PXFIN";
+  var SAFE = "BCDEFGHIJKLNOPRSTUVXY", FIN = "PXFIN", POPEN = "PXOPEN", PCLOSE = "PXCLOSE";
 
   function qs(s){ return document.querySelector(s); }
   function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return { "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]; }); }
@@ -1485,6 +1512,19 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
   function codeCause(type, c){ return "PX" + (type === "Planifié" ? "P" : "N") + hash4(c); }
   function codeMachine(m){ return "PXK" + hash4(m); }
 
+  // ---------- Équipes détectées automatiquement par l'heure ----------
+  // Matin 6h–14h · Après-midi 14h–22h · Nuit 22h–6h (la nuit court sur deux jours).
+  var SHIFTS = [["Matin", 6, 14], ["Après-midi", 14, 22], ["Nuit", 22, 30]];
+  function equipeAt(d){ var h = (d || new Date()).getHours(); return h >= 6 && h < 14 ? "Matin" : h >= 14 && h < 22 ? "Après-midi" : "Nuit"; }
+  function shiftBounds(now){ now = now ? new Date(now) : new Date(); var h = now.getHours(), base = new Date(now); base.setHours(0, 0, 0, 0);
+    var s = h >= 6 && h < 14 ? ["Matin", 6] : h >= 14 && h < 22 ? ["Après-midi", 14] : ["Nuit", 22];
+    if (s[0] === "Nuit" && h < 6) base.setDate(base.getDate() - 1);
+    var start = base.getTime() + s[1] * 3600000; return { name: s[0], start: start, end: start + 8 * 3600000 }; }
+  function shiftWindowFor(equipe, dateStr){ var base = new Date(dateStr + "T00:00:00").getTime(), s = SHIFTS.filter(function(x){ return x[0] === equipe; })[0] || SHIFTS[0]; return { start: base + s[1] * 3600000, end: base + s[2] * 3600000 }; }
+  function overlap(a1, a2, b1, b2){ return Math.max(0, Math.min(a2, b2) - Math.max(a1, b1)); }
+  // Ligne déduite du code machine entre parenthèses : F… = Fraisage, T… = Tournage.
+  function ligneOf(m){ var c = (/\(([^)]+)\)/.exec(m || "") || [])[1] || ""; return /^f/i.test(c) ? "Ligne Fraisage" : /^t/i.test(c) ? "Ligne Tournage" : ""; }
+
   // ---------- Configuration Firebase (résiste à la traduction automatique de Chrome) ----------
   function parseFirebaseConfig(txt){
     txt = String(txt || "");
@@ -1497,7 +1537,7 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
     return { apiKey: api, authDomain: dom || pid + ".firebaseapp.com", projectId: pid, storageBucket: bucket || pid + ".appspot.com", messagingSenderId: app.split(":")[1], appId: app };
   }
 
-  var db = null, state = { arrets: [], lists: JSON.parse(JSON.stringify(DEFAULTS)), ready: false };
+  var db = null, state = { arrets: [], production: [], pointages: [], lists: JSON.parse(JSON.stringify(DEFAULTS)), ready: false };
   var poste = ls(K_POSTE) || (EMBED_OPTS && EMBED_OPTS.poste) || {};
   var view = location.hash === "#scan" ? "poste" : location.hash === "#suivi" ? "suivi" : (ls(K_VIEW) || (EMBED_OPTS && EMBED_OPTS.view) || "suivi");
   if (EMBED_OPTS && EMBED_OPTS.lock){ qs('.tab[data-view="params"]').hidden = true; if (view === "params") view = EMBED_OPTS.view || "poste"; }
@@ -1511,7 +1551,7 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
     var mach = list.filter(function(x){ var c = /\(([^)]+)\)/.exec(x); return c && c[1].toLowerCase() === code; })[0];
     if (!mach) return false;
     var ligne = /^f/i.test(code) ? "Ligne Fraisage" : /^t/i.test(code) ? "Ligne Tournage" : (poste.ligne || "");
-    poste = { machine: mach, ligne: ligne, equipe: poste.machine === mach ? (poste.equipe || "") : (poste.equipe || "") };
+    poste = { machine: mach, ligne: ligne };
     ls(K_POSTE, poste);
     view = "poste";
     return true;
@@ -1572,6 +1612,14 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
       }
       renderAll();
     }, function(e){ toast("Lecture arrêts : " + e.message, true); });
+    db.collection("production").orderBy("date", "desc").limit(3000).onSnapshot(function(snap){
+      state.production = snap.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; });
+      renderAll();
+    }, function(e){ /* collection « production » peut ne pas exister encore */ });
+    db.collection("pointages").orderBy("debut", "desc").limit(3000).onSnapshot(function(snap){
+      state.pointages = snap.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; });
+      renderAll();
+    }, function(e){ /* collection « pointages » peut ne pas exister encore */ });
   }
 
   // ---------- Vues ----------
@@ -1603,15 +1651,15 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
   function renderPoste(){
     var L = state.lists, set = !!poste.machine;
     qs("#pTitle").textContent = set ? "Machine " + poste.machine : "Poste non configuré";
-    qs("#pSub").textContent = set ? [poste.ligne, poste.equipe ? "Équipe " + poste.equipe : ""].filter(Boolean).join(" · ") : "Choisissez la machine de cette tablette.";
+    qs("#pSub").textContent = set ? [poste.ligne, "Équipe " + equipeAt() + " (auto)"].filter(Boolean).join(" · ") : "Choisissez la machine de cette tablette.";
     var cfgOpen = !set || qs("#pCfg").getAttribute("data-force") === "1";
     qs("#pCfg").hidden = !cfgOpen;
     if (cfgOpen && document.activeElement && !/SELECT/.test(document.activeElement.tagName)){
       qs("#pMachine").innerHTML = opts(L.machines, poste.machine);
       qs("#pLigne").innerHTML = opts(L.lignes, poste.ligne);
-      qs("#pEquipe").innerHTML = opts(L.equipes, poste.equipe);
     }
-    ["#pFin", "#pCauses"].forEach(function(s){ qs(s).hidden = !set; });
+    ["#pFin", "#pCauses", "#pProd", "#pPointage"].forEach(function(s){ qs(s).hidden = !set; });
+    if (set){ renderProd(); renderPointage(); }
     var open = set ? openOf(poste.machine) : null, st = qs("#pStatus");
     st.className = "status " + (!set ? "" : open ? "stop" + (open.typeArret === "Planifié" ? " plan" : "") : "run");
     st.innerHTML = !set ? '<div class="st">Poste non configuré</div>' :
@@ -1632,10 +1680,87 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
   function savePoste(p){ poste = p; ls(K_POSTE, p); qs("#pCfg").removeAttribute("data-force"); renderPoste(); }
   qs("#pCfgOk").addEventListener("click", function(){
     var m = qs("#pMachine").value; if (!m){ toast("Choisissez la machine.", true); return; }
-    savePoste({ machine: m, ligne: qs("#pLigne").value, equipe: qs("#pEquipe").value });
+    savePoste({ machine: m, ligne: qs("#pLigne").value });
     qs("#scanBox").focus();
   });
   qs("#pChange").addEventListener("click", function(){ qs("#pCfg").setAttribute("data-force", "1"); qs("#pMachine").blur(); renderPoste(); });
+
+  // ---------- Production du poste (pour le TRS) ----------
+  function prodId(machine, date, equipe){ return date + "_" + codeMachine(machine) + "_" + hash4(equipe || "-"); }
+  function prodFind(machine, date, equipe){ var id = prodId(machine, date, equipe); return state.production.filter(function(p){ return p.id === id; })[0] || null; }
+  function prodDef(){
+    var tot = Number(qs("#prTot").value) || 0, conf = Number(qs("#prConf").value) || 0, def = Math.max(0, tot - conf);
+    qs("#prDef").value = (qs("#prTot").value === "" && qs("#prConf").value === "") ? "" : def;
+    qs("#prQual").textContent = tot > 0 ? "Taux de qualité : " + fmtNum(conf / tot * 100, 1) + " %  ·  défectueuses : " + fmtNum(def) : "Saisissez le temps d'ouverture et les quantités.";
+    qs("#prQual").className = "hint" + (tot > 0 && conf / tot < 0.95 ? " err" : "");
+  }
+  function renderProd(){
+    if (!poste.machine) return;
+    var ex = prodFind(poste.machine, dISO(), equipeAt());
+    [["#prTot", ex ? ex.qteTotale : ""], ["#prConf", ex ? ex.qteConforme : ""]].forEach(function(a){
+      var el = qs(a[0]); if (el && document.activeElement !== el) el.value = (a[1] == null ? "" : a[1]);
+    });
+    prodDef();
+  }
+  ["#prTot", "#prConf"].forEach(function(s){ qs(s).addEventListener("input", prodDef); });
+  qs("#prSave").addEventListener("click", function(){
+    if (!db){ toast("Pas de connexion à la base.", true); return; }
+    if (!poste.machine){ toast("Choisissez d'abord la machine.", true); return; }
+    var tot = Number(qs("#prTot").value) || 0, conf = Number(qs("#prConf").value) || 0;
+    if (conf > tot){ toast("La quantité conforme dépasse la quantité totale.", true); return; }
+    var eq = equipeAt(), date = dISO(), id = prodId(poste.machine, date, eq), sb = shiftBounds();
+    db.collection("production").doc(id).set({
+      machine: poste.machine, ligne: poste.ligne || "", equipe: eq, date: date,
+      tempsOuvertureMin: Math.round(ouvWindow(poste.machine, sb.start, sb.end).running / 60000), qteTotale: tot, qteConforme: conf, qteDefectueuse: Math.max(0, tot - conf),
+      source: "arrets-atelier", updatedAt: new Date().toISOString()
+    }, { merge: true }).then(function(){ toast("Production enregistrée : " + poste.machine + " (" + fmtDate(date) + ")."); }).catch(function(e){ toast(e.message, true); });
+  });
+
+  // ---------- Pointage : temps d'ouverture = temps pointé − arrêts (se met en pause pendant les arrêts) ----------
+  function openPointage(m){ return state.pointages.filter(function(p){ return p.machine === m && p.statut === "Ouvert"; }).sort(function(a,b){ return a.debut < b.debut ? 1 : -1; })[0] || null; }
+  function ouvWindow(machine, startMs, endMs, nowMs){
+    nowMs = nowMs || Date.now(); var cap = Math.min(endMs, nowMs), brut = 0, arr = 0;
+    state.pointages.forEach(function(s){ if (s.machine !== machine) return; var a = new Date(s.debut).getTime(), b = s.fin ? new Date(s.fin).getTime() : nowMs; brut += overlap(a, b, startMs, cap); });
+    state.arrets.forEach(function(x){ if (x.machine !== machine) return; var a = new Date(x.debut).getTime(), b = x.fin ? new Date(x.fin).getTime() : nowMs; arr += overlap(a, b, startMs, cap); });
+    return { brut: brut, arret: arr, running: Math.max(0, brut - arr) };
+  }
+  function ouvertureInfo(machine, date, nowMs){ var w = shiftWindowFor(equipeAt(nowMs ? new Date(nowMs) : null), date); return ouvWindow(machine, w.start, w.end, nowMs); }
+  function ouvByEquipe(fromStr, toStr, nowMs){
+    nowMs = nowMs || Date.now(); var acc = { "Matin": { ouv: 0, arr: 0 }, "Après-midi": { ouv: 0, arr: 0 }, "Nuit": { ouv: 0, arr: 0 } };
+    var d = new Date(fromStr + "T12:00:00"), end = new Date(toStr + "T12:00:00");
+    while (d <= end){ var ds = dISO(d); SHIFTS.forEach(function(s){ var base = new Date(ds + "T00:00:00").getTime(), w0 = base + s[1] * 3600000, cap = Math.min(base + s[2] * 3600000, nowMs);
+        state.pointages.forEach(function(pt){ var a = new Date(pt.debut).getTime(), b = pt.fin ? new Date(pt.fin).getTime() : nowMs; acc[s[0]].ouv += overlap(a, b, w0, cap); });
+        state.arrets.forEach(function(x){ var a = new Date(x.debut).getTime(), b = x.fin ? new Date(x.fin).getTime() : nowMs; acc[s[0]].arr += overlap(a, b, w0, cap); });
+      }); d.setDate(d.getDate() + 1); }
+    return acc;
+  }
+  function updateOuvClock(){
+    if (!poste.machine) return; var sb = shiftBounds();
+    var el = qs("#ouvClock"); if (el) el.textContent = elapsed(ouvWindow(poste.machine, sb.start, sb.end).running);
+  }
+  function renderPointage(){
+    if (!poste.machine) return;
+    var op = openPointage(poste.machine), inArret = !!openOf(poste.machine);
+    qs("#ptToggle").textContent = op ? "Fermer le poste (fin de poste)" : "Ouvrir le poste (démarrer le temps d'ouverture)";
+    qs("#ptToggle").className = "btn" + (op ? "" : " primary");
+    qs("#ptSub").textContent = (op ? "Poste ouvert depuis " + hm(op.debut) + "." : "Poste fermé — ouvrez-le en début de poste.") + " Équipe " + equipeAt() + " (6h / 14h / 22h).";
+    qs("#ptState").textContent = !op ? "" : inArret ? "en pause (arrêt)" : "en comptage";
+    qs("#ptState").className = "hint" + (op && inArret ? " err" : op ? " ok" : "");
+    updateOuvClock();
+  }
+  function pointerToggle(){
+    if (!db){ msg("Pas de connexion à la base.", false); return; }
+    if (!poste.machine){ msg("Choisissez d'abord la machine.", false); return; }
+    var op = openPointage(poste.machine);
+    if (op){ db.collection("pointages").doc(op.id).update({ fin: new Date().toISOString(), statut: "Fermé" }).catch(function(e){ toast(e.message, true); }); msg("Poste fermé — temps d'ouverture arrêté.", true); }
+    else {
+      var now = new Date(), id = "pt_" + now.getTime().toString(36) + Math.random().toString(36).slice(2, 5);
+      db.collection("pointages").doc(id).set({ machine: poste.machine, ligne: poste.ligne || "", equipe: equipeAt(now), date: dISO(now), debut: now.toISOString(), fin: null, statut: "Ouvert", source: "arrets-atelier", createdAt: now.toISOString() }).catch(function(e){ toast(e.message, true); });
+      msg("Poste ouvert — temps d'ouverture démarré.", true);
+    }
+  }
+  qs("#ptToggle").addEventListener("click", pointerToggle);
+  setInterval(function(){ if (view === "poste" && poste.machine) updateOuvClock(); }, 1000);
 
   function finish(a){
     var fin = new Date(), d = Math.max(0.1, Math.round((fin - new Date(a.debut)) / 6000) / 10);
@@ -1655,7 +1780,7 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
     if (open) finish(open).catch(function(e){ toast(e.message, true); });
     var now = new Date(), id = "arr_" + now.getTime().toString(36) + Math.random().toString(36).slice(2, 6);
     db.collection("arrets").doc(id).set({
-      machine: poste.machine, ligne: poste.ligne || "", equipe: poste.equipe || "", date: dISO(now),
+      machine: poste.machine, ligne: poste.ligne || "", equipe: equipeAt(now), date: dISO(now),
       debut: now.toISOString(), fin: null, dureeMin: 0, typeArret: type, cause: cause, statut: "En cours",
       source: "scan-firebase", createdAt: now.toISOString()
     }).catch(function(e){ toast(e.message, true); });
@@ -1673,6 +1798,8 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
     var s = String(raw || "").toUpperCase().replace(/[^A-Z]/g, ""), i = s.indexOf("PX");
     if (i < 0) return null; s = s.slice(i);
     if (s.indexOf(FIN) === 0) return { k: "fin" };
+    if (s.indexOf(POPEN) === 0) return { k: "pointage", open: true };
+    if (s.indexOf(PCLOSE) === 0) return { k: "pointage", open: false };
     if (s.length < 7) return null;
     var t = s.charAt(2), h = s.slice(3, 7), L = state.lists;
     if (t === "K"){ var m = (L.machines || []).filter(function(x){ return hash4(x) === h; })[0]; return m ? { k: "machine", m: m } : { k: "?" }; }
@@ -1688,7 +1815,8 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
     if (!r){ msg("QR non reconnu.", false); return; }
     if (r.k === "?"){ msg("QR d'une cause ou machine absente des Paramètres — réimprimez les QR.", false); return; }
     if (r.k === "fin") return endArret();
-    if (r.k === "machine"){ savePoste({ machine: r.m, ligne: poste.ligne || "", equipe: poste.equipe || "" }); msg("Poste réglé sur " + r.m + ".", true); return; }
+    if (r.k === "pointage"){ if (!poste.machine){ msg("Choisissez d'abord la machine.", false); return; } var pop = openPointage(poste.machine); if (r.open === !!pop){ msg(r.open ? "Poste déjà ouvert." : "Poste déjà fermé.", true); } else pointerToggle(); return; }
+    if (r.k === "machine"){ savePoste({ machine: r.m, ligne: ligneOf(r.m) || poste.ligne || "" }); msg("Poste réglé sur " + r.m + (ligneOf(r.m) ? " · " + ligneOf(r.m) : "") + ".", true); return; }
     startArret(r.t, r.c);
   }
   (function(){
@@ -1731,6 +1859,23 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
       '<div class="kpi"><div class="v">' + rows.length + '</div><div class="l">Arrêts ' + perLbl + '</div></div>' +
       '<div class="kpi"><div class="v">' + fmtNum(np) + '</div><div class="l">Min non planifiées</div></div>' +
       '<div class="kpi"><div class="v">' + fmtNum(tot - np) + '</div><div class="l">Min planifiées</div></div>';
+    var prod = state.production.filter(function(p){ return p.date >= from && p.date <= day; });
+    var qTot = 0, qConf = 0, qDef = 0;
+    prod.forEach(function(p){ qTot += Number(p.qteTotale) || 0; qConf += Number(p.qteConforme) || 0; qDef += Number(p.qteDefectueuse) || 0; });
+    var byEq = ouvByEquipe(from, day);
+    var ouvBrutMin = (byEq["Matin"].ouv + byEq["Après-midi"].ouv + byEq["Nuit"].ouv) / 60000;
+    var arrWinMin = (byEq["Matin"].arr + byEq["Après-midi"].arr + byEq["Nuit"].arr) / 60000;
+    var ouv = Math.max(0, ouvBrutMin - arrWinMin);
+    var qual = qTot > 0 ? qConf / qTot * 100 : null;
+    var dispo = ouvBrutMin > 0 ? ouv / ouvBrutMin * 100 : null;
+    qs("#sProdSub").textContent = "Temps d'ouverture par équipe — " + ["Matin", "Après-midi", "Nuit"].map(function(e){ return e + " : " + fmtNum(Math.max(0, (byEq[e].ouv - byEq[e].arr)) / 60000) + " min"; }).join("  ·  ");
+    qs("#sProdKpis").innerHTML =
+      '<div class="kpi"><div class="v">' + (ouv ? fmtNum(ouv) : "—") + '</div><div class="l">Temps d\'ouverture (min)</div></div>' +
+      '<div class="kpi"><div class="v">' + fmtNum(qTot) + '</div><div class="l">Qté totale</div></div>' +
+      '<div class="kpi"><div class="v">' + fmtNum(qConf) + '</div><div class="l">Qté conforme</div></div>' +
+      '<div class="kpi' + (qDef ? " alert" : "") + '"><div class="v">' + fmtNum(qDef) + '</div><div class="l">Qté défectueuse</div></div>' +
+      '<div class="kpi"><div class="v">' + (qual == null ? "—" : fmtNum(qual, 1) + " %") + '</div><div class="l">Taux de qualité</div></div>' +
+      '<div class="kpi"><div class="v">' + (dispo == null ? "—" : fmtNum(dispo, 1) + " %") + '</div><div class="l">Disponibilité</div></div>';
     qs("#sOpen").innerHTML = !open.length ? '<div class="empty">Aucune machine à l\'arrêt — tout tourne.</div>' : open.map(function(a){
       var nw = newIds[a.id] && Date.now() - newIds[a.id] < 30000, pl = a.typeArret === "Planifié";
       return '<div class="oc' + (pl ? " plan" : "") + (nw ? " new" : "") + '"><div class="m">' + esc(a.machine) + '</div><div class="c">' + esc(a.cause) +
@@ -1774,10 +1919,10 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
   setInterval(function(){ if (view === "suivi") renderSuivi(); }, 60000);
 
   // ---------- Paramètres ----------
-  var LMAP = { lNP: "causesNonPlanifie", lP: "causesPlanifie", lM: "machines", lL: "lignes", lE: "equipes" };
+  var LMAP = { lNP: "causesNonPlanifie", lP: "causesPlanifie", lM: "machines", lL: "lignes" };
   function fillOpSelects(){
     var L = state.lists;
-    [["#opMachine", L.machines], ["#opLigne", L.lignes], ["#opEquipe", L.equipes]].forEach(function(x){
+    [["#opMachine", L.machines], ["#opLigne", L.lignes]].forEach(function(x){
       var el = qs(x[0]), v = el.value;
       el.innerHTML = '<option value="">— Choisie sur la tablette —</option>' + (x[1] || []).map(function(o){ return '<option' + (o === v ? " selected" : "") + '>' + esc(o) + '</option>'; }).join("");
     });
@@ -1787,7 +1932,7 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
     if (!cfg){ toast("Connectez d'abord cet appareil à Firebase.", true); return; }
     var m = qs("#opMachine").value;
     var opts = { view: qs("#opView").value, lock: qs("#opLock").checked,
-      poste: m ? { machine: m, ligne: qs("#opLigne").value, equipe: qs("#opEquipe").value } : null };
+      poste: m ? { machine: m, ligne: qs("#opLigne").value } : null };
     var out = PRISTINE
       .replace(/var EMBED_CONFIG = \/\*__FIREBASE_CONFIG__\*\/[^;]*;/, function(){ return "var EMBED_CONFIG = /*__FIREBASE_CONFIG__*/" + JSON.stringify(cfg) + ";"; })
       .replace(/var EMBED_OPTS = \/\*__OPTS__\*\/[^;]*;/, function(){ return "var EMBED_OPTS = /*__OPTS__*/" + JSON.stringify(opts) + ";"; });
@@ -1830,7 +1975,9 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
     var f = qs("#eFrom").value, t = qs("#eTo").value;
     var rows = state.arrets.filter(function(a){ return a.statut === "Terminé" && (!f || a.date >= f) && (!t || a.date <= t); });
     if (!rows.length){ toast("Aucun arrêt terminé sur cette période.", true); return; }
-    var data = { type: "pilotage-atelier-arrets", version: 1, exportedAt: new Date().toISOString(), arrets: rows };
+    var prod = state.production.filter(function(p){ return (!f || p.date >= f) && (!t || p.date <= t); }).map(function(p){ var o = Object.assign({}, p); var w = shiftWindowFor(p.equipe, p.date); o.tempsOuvertureMin = Math.round(ouvWindow(p.machine, w.start, w.end).running / 60000); return o; });
+    var pts = state.pointages.filter(function(p){ return (!f || p.date >= f) && (!t || p.date <= t); });
+    var data = { type: "pilotage-atelier-arrets", version: 1, exportedAt: new Date().toISOString(), arrets: rows, production: prod, pointages: pts };
     var a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" }));
     a.download = "arrets_" + (f || "debut") + "_au_" + (t || "fin") + ".json";
@@ -1865,8 +2012,10 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
   }
   qs("#qCauses").addEventListener("click", function(){
     var L = state.lists;
-    printCards("Arrêts machine — scannez la cause", "Début d'arrêt : scannez la cause. Reprise : scannez FIN D'ARRÊT. Valable pour toutes les machines.",
-      [{ tag: "REPRISE PRODUCTION", label: "FIN D'ARRÊT", code: FIN, col: "#168c5a" }]
+    printCards("Arrêts machine — scannez la cause", "Début de poste : scannez OUVERTURE. Arrêt : scannez la cause. Reprise : FIN D'ARRÊT. Fin de poste : scannez FERMETURE.",
+      [{ tag: "DÉBUT DE POSTE", label: "OUVERTURE (pointage)", code: POPEN, col: "#143c82" },
+       { tag: "FIN DE POSTE", label: "FERMETURE du poste", code: PCLOSE, col: "#555555" },
+       { tag: "REPRISE PRODUCTION", label: "FIN D'ARRÊT", code: FIN, col: "#168c5a" }]
         .concat((L.causesNonPlanifie || []).map(function(c){ return { tag: "ARRÊT NON PLANIFIÉ", label: c, code: codeCause("Non planifié", c), col: "#c82828" }; }))
         .concat((L.causesPlanifie || []).map(function(c){ return { tag: "ARRÊT PLANIFIÉ", label: c, code: codeCause("Planifié", c), col: "#d68c14" }; })));
   });
@@ -1875,7 +2024,7 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
       (state.lists.machines || []).map(function(m){ return { tag: "CONFIGURER LE POSTE", label: "Machine " + m, code: codeMachine(m), col: "#143c82" }; }));
   });
 
-  window.__arretsTest = { hash4: hash4, parse: parseFirebaseConfig, decode: decode };
+  window.__arretsTest = { hash4: hash4, parse: parseFirebaseConfig, decode: decode, ouvertureInfo: ouvertureInfo, openPointage: openPointage, equipeAt: equipeAt, shiftBounds: shiftBounds, ouvWindow: ouvWindow, ouvByEquipe: ouvByEquipe };
   connect();
 })();
 </script>
