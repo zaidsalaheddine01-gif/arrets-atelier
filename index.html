@@ -147,14 +147,6 @@
     <!-- Champ de réception de la douchette : invisible, il garde le focus pour recevoir les scans. -->
     <input id="scanBox" class="scanbox scan-hidden" aria-label="Réception douchette" tabindex="-1" inputmode="none" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Scannez le QR ici…">
     <div class="msg" id="pMsg">Prêt à scanner.</div>
-    <div class="card" id="pOper">
-      <div class="field"><label>Nom d'opérateur</label><input id="pOperName" type="text" autocomplete="off" autocapitalize="words" placeholder="ex. Ahmed Bennani"></div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
-        <div class="field"><label>OF en cours</label><input id="pOf" type="text" autocomplete="off" inputmode="text" placeholder="ex. OF-12345"></div>
-        <div class="field"><label>OP / Phase en cours</label><input id="pPhase" type="text" autocomplete="off" inputmode="text" placeholder="ex. 30"></div>
-      </div>
-      <div class="hint" style="margin-top:4px">Enregistré avec les arrêts, le pointage et la production (traçabilité).</div>
-    </div>
     <div class="card" id="pPointage">
       <div class="row" style="align-items:center;justify-content:space-between">
         <div>
@@ -177,9 +169,14 @@
       <div class="grid" id="pP"></div>
     </div>
     <div class="card" id="pProd">
-      <h2>Production du poste (fin de poste)</h2>
-      <div class="sub">La quantité défectueuse se calcule seule. Le temps d'ouverture est mesuré par le pointage ci-dessus.</div>
-      <div class="row">
+      <h2>Saisie production du poste</h2>
+      <div class="sub">Opérateur, OF et phase + quantités : tout est enregistré ensemble (traçabilité). La quantité défectueuse se calcule seule ; le temps d'ouverture vient du pointage ci-dessus.</div>
+      <div class="field"><label>Nom d'opérateur</label><input id="pOperName" type="text" autocomplete="off" autocapitalize="words" placeholder="ex. Ahmed Bennani"></div>
+      <div class="row" style="margin-top:8px">
+        <div class="field"><label>OF en cours</label><input id="pOf" type="text" autocomplete="off" inputmode="text" placeholder="ex. OF-12345"></div>
+        <div class="field"><label>OP / Phase en cours</label><input id="pPhase" type="text" autocomplete="off" inputmode="text" placeholder="ex. 30"></div>
+      </div>
+      <div class="row" style="margin-top:10px">
         <div class="field"><label>Qté totale</label><input type="number" id="prTot" min="0" step="1" inputmode="numeric" placeholder="ex. 320"></div>
         <div class="field"><label>Qté conforme</label><input type="number" id="prConf" min="0" step="1" inputmode="numeric" placeholder="ex. 312"></div>
         <div class="field"><label>Qté défectueuse (auto)</label><input type="number" id="prDef" readonly tabindex="-1" placeholder="—"></div>
@@ -1666,7 +1663,7 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
       qs("#pMachine").innerHTML = opts(L.machines, poste.machine);
       qs("#pLigne").innerHTML = opts(L.lignes, poste.ligne);
     }
-    ["#pFin", "#pCauses", "#pProd", "#pPointage", "#pOper"].forEach(function(s){ qs(s).hidden = !set; });
+    ["#pFin", "#pCauses", "#pProd", "#pPointage"].forEach(function(s){ qs(s).hidden = !set; });
     if (set){
       var opEl = qs("#pOperName"); if (opEl && document.activeElement !== opEl) opEl.value = poste.operateur || "";
       var ofEl = qs("#pOf"); if (ofEl && document.activeElement !== ofEl) ofEl.value = poste.of || "";
