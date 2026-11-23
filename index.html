@@ -1633,7 +1633,7 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
   }
 
   // ---------- Vues ----------
-  var menuOpen = false;
+  var menuOpen = true;
   qs("#appTitle").addEventListener("dblclick", function(){
     if (EMBED_OPTS && EMBED_OPTS.lock) return;
     menuOpen = !menuOpen; qs("#tabs").hidden = !menuOpen;
@@ -1661,7 +1661,7 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
       if (code !== PARAM_CODE){ toast("Code d'accès incorrect.", true); return; }
       paramUnlocked = true;
     }
-    menuOpen = false; show(target);
+    show(target);
   });
   function renderAll(){ if (view === "poste") renderPoste(); if (view === "suivi") renderSuivi(); if (view === "params") renderParamsList(); }
 
