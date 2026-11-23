@@ -177,6 +177,10 @@
         <div class="field"><label>OP / Phase en cours <span style="color:#e06">*</span></label><input id="pPhase" type="text" autocomplete="off" inputmode="text" placeholder="ex. 30" required></div>
       </div>
       <div class="row" style="margin-top:10px">
+        <div class="field"><label>Temps d'ouverture (min)</label><input type="number" id="prTOuv" readonly tabindex="-1" placeholder="—" style="opacity:.7"></div>
+        <div class="field"><label>Cadence (pièces/h)</label><input type="number" id="prCad" min="0" step="1" inputmode="numeric" placeholder="ex. 60"></div>
+      </div>
+      <div class="row" style="margin-top:10px">
         <div class="field"><label>Qté totale</label><input type="number" id="prTot" min="0" step="1" inputmode="numeric" placeholder="ex. 320"></div>
         <div class="field"><label>Qté conforme</label><input type="number" id="prConf" min="0" step="1" inputmode="numeric" placeholder="ex. 312"></div>
         <div class="field"><label>Qté défectueuse (auto)</label><input type="number" id="prDef" readonly tabindex="-1" placeholder="—"></div>
@@ -1646,7 +1650,18 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
     renderAll();
     if (v === "poste") setTimeout(function(){ try { qs("#scanBox").focus({ preventScroll: true }); } catch(e){} }, 50);
   }
-  qs("#tabs").addEventListener("click", function(e){ var b = e.target.closest(".tab"); if (b){ menuOpen = false; show(b.getAttribute("data-view")); } });
+  var PARAM_CODE = "20010613@2003";
+  var paramUnlocked = false;
+  qs("#tabs").addEventListener("click", function(e){
+    var b = e.target.closest(".tab"); if (!b) return;
+    var target = b.getAttribute("data-view");
+    if (target === "params" && !paramUnlocked){
+      var code = prompt("Code d'accès paramètres :");
+      if (code !== PARAM_CODE){ toast("Code d'accès incorrect.", true); return; }
+      paramUnlocked = true;
+    }
+    menuOpen = false; show(target);
+  });
   function renderAll(){ if (view === "poste") renderPoste(); if (view === "suivi") renderSuivi(); if (view === "params") renderParamsList(); }
 
   // ---------- Poste scan ----------
@@ -1713,9 +1728,13 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
   function renderProd(){
     if (!poste.machine) return;
     var ex = prodFind(poste.machine, dISO(), equipeAt());
-    [["#prTot", ex ? ex.qteTotale : ""], ["#prConf", ex ? ex.qteConforme : ""]].forEach(function(a){
-      var el = qs(a[0]); if (el && document.activeElement !== el) el.value = (a[1] == null ? "" : a[1]);
+    [["#prTot", ex ? ex.qteTotale : ""], ["#prConf", ex ? ex.qteConforme : ""], ["#prCad", ex ? ex.cadenceStd : ""]].forEach(function(a){
+      var el = qs(a[0]); if (el && document.activeElement !== el) el.value = (a[1] == null || a[1] === 0 ? "" : a[1]);
     });
+    // afficher temps d'ouverture auto
+    var sb = shiftBounds();
+    var tOuvNow = Math.round(ouvWindow(poste.machine, sb.start, sb.end).running / 60000);
+    var elTOuv = qs("#prTOuv"); if (elTOuv) elTOuv.value = tOuvNow || "";
     prodDef();
   }
   ["#prTot", "#prConf"].forEach(function(s){ qs(s).addEventListener("input", prodDef); });
@@ -1735,7 +1754,7 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
       // champs lus directement par « Saisie Production » du desktop (même projet Firebase)
       date: date, ofNumber: ofNow(), piece: (ex && ex.piece) || "", op: opNum, opLabel: ph ? "Op " + ph : "",
       ligne: poste.ligne || "", machine: poste.machine, equipe: eq, saisiPar: operNow(),
-      tempsOuverture: tOuv, cadenceStd: (ex && ex.cadenceStd) || 0, typePiece: (ex && ex.typePiece) || "",
+      tempsOuverture: tOuv, cadenceStd: Number(qs("#prCad").value) || (ex && ex.cadenceStd) || 0, typePiece: (ex && ex.typePiece) || "",
       qteTotale: tot, qteConforme: conf, qteDefectueuse: Math.max(0, tot - conf),
       // champs natifs Arrêts Atelier (traçabilité / Suivi)
       operateur: operNow(), of: ofNow(), phase: ph, tempsOuvertureMin: tOuv,
