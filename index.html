@@ -1519,7 +1519,8 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
 
   function hash4(s){ s = String(s == null ? "" : s).trim().toLowerCase(); var h = 2166136261; for (var i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } var o = ""; for (var k = 0; k < 4; k++){ o += SAFE.charAt(h % 21); h = Math.floor(h / 21); } return o; }
   function codeCause(type, c){ return "PX" + (type === "Planifié" ? "P" : "N") + hash4(c); }
-  function codeMachine(m){ return "PXK" + hash4(m); }
+  function machRef(m){ var r = /\(([^)]+)\)/.exec(m); return r ? r[1] : ""; }
+  function codeMachine(m){ var r = machRef(m); return r ? "PXK" + r : "PXK" + hash4(m); }
 
   // ---------- Équipes détectées automatiquement par l'heure ----------
   // Matin 6h–14h · Après-midi 14h–22h · Nuit 22h–6h (la nuit court sur deux jours).
@@ -1841,17 +1842,31 @@ return function(text){ var q = new QRCode(-1, QRErrorCorrectLevel.M); q.addData(
     msg("Reprise production — « " + open.cause + " ».", true);
   }
   function decode(raw){
-    var s = String(raw || "").toUpperCase().replace(/[^A-Z]/g, ""), i = s.indexOf("PX");
+    var orig = String(raw || "").toUpperCase().trim(), L = state.lists;
+    // --- Machine par code de référence (nouveau format : PXKFNV3-01) ---
+    var refM = /PXK([A-Z0-9][A-Z0-9_-]*)/i.exec(orig);
+    if (refM){
+      var ref = refM[1];
+      // 1) Essayer correspondance par référence (entre parenthèses)
+      var m = (L.machines || []).filter(function(x){ return machRef(x).toUpperCase() === ref; })[0];
+      if (m) return { k: "machine", m: m };
+      // 2) Fallback hash4 (ancien format : PXKPOCE — 4 lettres)
+      var h = ref.replace(/[^A-Z]/g, "");
+      if (h.length >= 4){ h = h.slice(0, 4); m = (L.machines || []).filter(function(x){ return hash4(x) === h; })[0]; if (m) return { k: "machine", m: m }; }
+      return { k: "?" };
+    }
+    // --- Ancien décodage (causes, fin, pointage) ---
+    var s = orig.replace(/[^A-Z]/g, ""), i = s.indexOf("PX");
     if (i < 0) return null; s = s.slice(i);
     if (s.indexOf(FIN) === 0) return { k: "fin" };
     if (s.indexOf(POPEN) === 0) return { k: "pointage", open: true };
     if (s.indexOf(PCLOSE) === 0) return { k: "pointage", open: false };
     if (s.length < 7) return null;
-    var t = s.charAt(2), h = s.slice(3, 7), L = state.lists;
-    if (t === "K"){ var m = (L.machines || []).filter(function(x){ return hash4(x) === h; })[0]; return m ? { k: "machine", m: m } : { k: "?" }; }
+    var t = s.charAt(2), h2 = s.slice(3, 7);
+    if (t === "K"){ var m2 = (L.machines || []).filter(function(x){ return hash4(x) === h2; })[0]; return m2 ? { k: "machine", m: m2 } : { k: "?" }; }
     if (t === "P" || t === "N"){
       var type = t === "P" ? "Planifié" : "Non planifié", list = t === "P" ? L.causesPlanifie : L.causesNonPlanifie;
-      var c = (list || []).filter(function(x){ return hash4(x) === h; })[0];
+      var c = (list || []).filter(function(x){ return hash4(x) === h2; })[0];
       return c ? { k: "cause", t: type, c: c } : { k: "?" };
     }
     return null;
